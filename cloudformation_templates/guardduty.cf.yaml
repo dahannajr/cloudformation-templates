@@ -1,0 +1,23 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Establish a Guard Duty Detector for the account
+Parameters:
+  GuardDutyPublishingFrequency:
+    Type: String
+    Description: Specifies how frequently updated findings are exported.
+    Default: FIFTEEN_MINUTES
+    AllowedValues:
+      - FIFTEEN_MINUTES
+      - ONE_HOUR
+      - SIX_HOURS
+Resources:
+  GuardDutyDetector:
+      Type: AWS::GuardDuty::Detector
+      Properties:
+          Enable: True
+          FindingPublishingFrequency: !Ref GuardDutyPublishingFrequency
+Outputs:
+  GuardDutyDetectorID:
+    Value: !Ref GuardDutyDetector
+    Description: The unique ID of the detector.
+    Export:
+      Name: !Sub '${AWS::StackName}-GuardDutyDetectorID'

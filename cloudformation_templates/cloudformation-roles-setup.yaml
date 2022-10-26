@@ -1,0 +1,189 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  Setup the necessary roles to allow a CLI user to create and update a CloudFormation Template
+Resources:
+  CloudFormationStackManagementGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: CloudFormationStackManagementGroup
+  PassRoleToCloudFormationServiceAdminRolePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument: !Sub 
+        - |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "VisualEditor1",
+                    "Effect": "Allow",
+                    "Action": [
+                        "iam:GetRole",
+                        "iam:PassRole"
+                    ],
+                    "Resource": "${CloudFormationServiceRoleArn}"
+                }
+            ]
+          }
+        - CloudFormationServiceRoleArn: !GetAtt  CloudFormationServiceAdminRole.Arn
+      PolicyName: PassRoleToCloudFormationServiceAdminRolePolicy
+      Groups:
+        - !Ref CloudFormationStackManagementGroup
+  InitiateCloudFormationRolePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument: !Sub |
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "CloudFormationTemplate",
+                    "Effect": "Allow",
+                    "Action": [
+                        "cloudformation:CreateChangeSet"
+                    ],
+                    "Resource": [
+                        "arn:aws:cloudformation:*:aws:transform/Serverless-2016-10-31"
+                    ]
+                },
+                {
+                    "Sid": "CloudFormationStack",
+                    "Effect": "Allow",
+                    "Action": [
+                        "cloudformation:CreateChangeSet",
+                        "cloudformation:CreateStack",
+                        "cloudformation:DeleteStack",
+                        "cloudformation:DescribeChangeSet",
+                        "cloudformation:DescribeStackEvents",
+                        "cloudformation:DescribeStacks",
+                        "cloudformation:ExecuteChangeSet",
+                        "cloudformation:GetTemplateSummary",
+                        "cloudformation:ListStackResources",
+                        "cloudformation:UpdateStack"
+                    ],
+                    "Resource": [
+                        "arn:aws:cloudformation:*:${AWS::AccountId}:stack/*"
+                    ]
+                },
+                {
+                    "Sid": "S3",
+                    "Effect": "Allow",
+                    "Action": [
+                        "s3:CreateBucket",
+                        "s3:GetObject",
+                        "s3:PutObject"
+                    ],
+                    "Resource": [
+                        "arn:aws:s3:::*/*"
+                    ]
+                },
+                {
+                    "Sid": "ECRRepository",
+                    "Effect": "Allow",
+                    "Action": [
+                        "ecr:BatchCheckLayerAvailability",
+                        "ecr:BatchGetImage",
+                        "ecr:CompleteLayerUpload",
+                        "ecr:CreateRepository",
+                        "ecr:DeleteRepository",
+                        "ecr:DescribeImages",
+                        "ecr:DescribeRepositories",
+                        "ecr:GetDownloadUrlForLayer",
+                        "ecr:GetRepositoryPolicy",
+                        "ecr:InitiateLayerUpload",
+                        "ecr:ListImages",
+                        "ecr:PutImage",
+                        "ecr:SetRepositoryPolicy",
+                        "ecr:UploadLayerPart"
+                    ],
+                    "Resource": [
+                        "arn:aws:ecr:*:${AWS::AccountId}:repository/*"
+                    ]
+                },
+                {
+                    "Sid": "ECRAuthToken",
+                    "Effect": "Allow",
+                    "Action": [
+                        "ecr:GetAuthorizationToken"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                },
+                {
+                    "Sid": "Lambda",
+                    "Effect": "Allow",
+                    "Action": [
+                        "lambda:AddPermission",
+                        "lambda:CreateFunction",
+                        "lambda:DeleteFunction",
+                        "lambda:GetFunction",
+                        "lambda:GetFunctionConfiguration",
+                        "lambda:ListTags",
+                        "lambda:RemovePermission",
+                        "lambda:TagResource",
+                        "lambda:UntagResource",
+                        "lambda:UpdateFunctionCode",
+                        "lambda:UpdateFunctionConfiguration"
+                    ],
+                    "Resource": [
+                        "arn:aws:lambda:*:${AWS::AccountId}:function:*"
+                    ]
+                },
+                {
+                    "Sid": "IAM",
+                    "Effect": "Allow",
+                    "Action": [
+                        "iam:*"
+                    ],
+                    "Resource": [
+                        "arn:aws:iam::${AWS::AccountId}:role/*"
+                    ]
+                },
+                {
+                    "Sid": "IAMPassRole",
+                    "Effect": "Allow",
+                    "Action": "iam:PassRole",
+                    "Resource": "*",
+                    "Condition": {
+                        "StringEquals": {
+                            "iam:PassedToService": "lambda.amazonaws.com"
+                        }
+                    }
+                },
+                {
+                    "Sid": "APIGateway",
+                    "Effect": "Allow",
+                    "Action": [
+                        "apigateway:DELETE",
+                        "apigateway:GET",
+                        "apigateway:PATCH",
+                        "apigateway:POST",
+                        "apigateway:PUT"
+                    ],
+                    "Resource": [
+                        "arn:aws:apigateway:*::*"
+                    ]
+                }
+            ]
+        }
+      PolicyName: InitiateCloudFormationRolePolicy
+      Groups:
+        - !Ref CloudFormationStackManagementGroup
+  CloudFormationServiceAdminRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument: 
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - cloudformation.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Description: Allows CloudFormation to create and manage AWS stacks and resources on your behalf
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+      RoleName: CloudFormationServiceAdminRole

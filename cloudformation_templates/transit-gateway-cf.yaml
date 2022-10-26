@@ -1,0 +1,32 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create a VPC and a VPC Peering connection using the PeerRole to accept.
+Resources:
+  TransitGateway:
+    Type: "AWS::EC2::TransitGateway"
+    Properties:
+      AmazonSideAsn: 65000
+      Description: "Shared Services TransitGateway Route Integration"
+      AutoAcceptSharedAttachments: "enable"
+      DefaultRouteTableAssociation: "disable"
+      DefaultRouteTablePropagation: "disable"
+      DnsSupport: "enable"
+      VpnEcmpSupport: "enable"
+      Tags:
+      - Key: Application
+        Value: !Ref 'AWS::StackId'
+  TransitGatewayRouteTable:
+    Type: AWS::EC2::TransitGatewayRouteTable
+    Properties: 
+      Tags: 
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+      TransitGatewayId: !Ref TransitGateway
+Outputs:
+  TransitGatewayId:
+    Value: !Ref TransitGateway
+    Export:
+      Name: !Sub '${AWS::StackName}-TransitGatewayId'
+  TransitGatewayRouteTableId:
+    Value: !Ref TransitGatewayRouteTable
+    Export:
+      Name: !Sub '${AWS::StackName}-TransitGatewayRouteTableId'

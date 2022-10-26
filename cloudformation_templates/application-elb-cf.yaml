@@ -1,0 +1,378 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Establish an ELB backed web application 
+Parameters: 
+  S3LogsEnabled:
+    Default: true
+    Type: String
+    AllowedValues:
+      - true
+      - false
+  VPCStackName:
+    Type: String
+  CertStacName:
+    Type: String
+    Default: ''
+  ELBScheme:
+    Description: Is the ELB Internet Facing or Internal
+    Type: String
+    Default: internet-facing
+    AllowedValues:
+      - internet-facing
+      - internal
+  ELBSubnets:
+    Description: Comma delimited list of subnets exported from the VPC creation stack
+    Type: CommaDelimitedList
+  ELBSubnetCount:
+    Description: Number of subnets in the comma delimited list
+    Type: Number
+    MinValue: 1
+    MaxValue: 6
+  ELBType:
+    Type: String
+    AllowedValues:
+      - application
+      - network
+  ELBSessionStickinessEnabled:
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+  ELBSessionStickinessTTL:
+    Type: Number
+    Default: 86400
+  ApplicationName:
+    Type: String
+  HealthCheckPath:
+    Type: String
+    Default: ''
+Conditions: 
+  EnableS3Logs: !Equals 
+    - !Ref S3LogsEnabled
+    - 'true'
+  HasSSLCertificate: !Not
+    - !Equals
+      - !Ref CertStacName
+      - ''
+  EnableHealthCheckCondition: !Not
+    - !Equals
+      - !Ref HealthCheckPath
+      - ''
+  ELBSessionStickinessEnabledCondition: !Equals 
+    - !Ref ELBSessionStickinessEnabled
+    - true
+  IsApplicationLoadBalancerCondition: !Equals 
+    - !Ref ELBType
+    - application
+  NumberOfSubnets1:
+      !Equals [ 1, !Ref ELBSubnetCount ]
+  NumberOfSubnets2:
+      !Equals [ 2, !Ref ELBSubnetCount ]
+  NumberOfSubnets3:
+      !Equals [ 3, !Ref ELBSubnetCount ]
+  NumberOfSubnets4:
+      !Equals [ 4, !Ref ELBSubnetCount ]
+  NumberOfSubnets5:
+      !Equals [ 5, !Ref ELBSubnetCount ]
+  NumberOfSubnets6:
+      !Equals [ 6, !Ref ELBSubnetCount ]
+  Subnet0: !Or
+    - !Condition NumberOfSubnets1
+    - !Condition NumberOfSubnets2
+    - !Condition NumberOfSubnets3
+    - !Condition NumberOfSubnets4
+    - !Condition NumberOfSubnets5
+    - !Condition NumberOfSubnets6
+  Subnet1: !Or
+    - !Condition NumberOfSubnets2
+    - !Condition NumberOfSubnets3
+    - !Condition NumberOfSubnets4
+    - !Condition NumberOfSubnets5
+    - !Condition NumberOfSubnets6
+  Subnet2: !Or
+    - !Condition NumberOfSubnets3
+    - !Condition NumberOfSubnets4
+    - !Condition NumberOfSubnets5
+    - !Condition NumberOfSubnets6
+  Subnet3: !Or
+    - !Condition NumberOfSubnets4
+    - !Condition NumberOfSubnets5
+    - !Condition NumberOfSubnets6
+  Subnet4: !Or
+    - !Condition NumberOfSubnets5
+    - !Condition NumberOfSubnets6
+  Subnet5: !Condition NumberOfSubnets6 
+Mappings:
+  RegionMap:
+    af-sout-1:
+      ELBAccountID: 098369216593
+    ap-east-1:
+      ELBAccountID: 754344448648
+    ap-northeast-1:
+      ELBAccountID: 582318560864
+    ap-northeast-2:
+      ELBAccountID: 600734575887
+    ap-northeast-3:
+      ELBAccountID: 383597477331
+    ap-south-1:
+      ELBAccountID: 718504428378
+    ap-southeast-1:
+      ELBAccountID: 114774131450
+    ap-southeast-2:
+      ELBAccountID: 783225319266
+    ca-central-1:
+      ELBAccountID: 985666609251
+    eu-central-1:
+      ELBAccountID: 054676820928
+    eu-north-1:
+      ELBAccountID: 897822967062
+    eu-south-1:
+      ELBAccountID: 635631232127
+    eu-west-1:
+      ELBAccountID: 156460612806
+    eu-west-2:
+      ELBAccountID: 652711504416
+    eu-west-3:
+      ELBAccountID: 009996457667
+    ne-south-1:
+      ELBAccountID: 076674570225
+    sa-east-1:
+      ELBAccountID: 507241528517
+    us-east-1:
+      ELBAccountID: 127311923021
+    us-east-2:
+      ELBAccountID: 033677994240
+    us-west-1:
+      ELBAccountID: 027434742980
+    us-west-2:
+      ELBAccountID: 797873946194
+Resources: 
+  S3LogBucket:
+    Type: "AWS::S3::Bucket"
+    Condition: EnableS3Logs
+    DeletionPolicy: Retain
+    Properties:
+      AccessControl: Private
+      BucketName: !Join
+        - '-'
+        - - !Ref AWS::AccountId
+          - !Ref AWS::Region
+          - !Ref ApplicationName
+      LifecycleConfiguration:
+        Rules:
+        - Id: GlacierRule
+          Status: Enabled
+          ExpirationInDays: '365'
+          Transitions:
+            - TransitionInDays: '60'
+              StorageClass: GLACIER
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: TRUE
+        BlockPublicPolicy: TRUE
+        IgnorePublicAcls: TRUE
+        RestrictPublicBuckets: TRUE
+  S3LogBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: EnableS3Logs
+    Properties: 
+      Bucket: !Ref S3LogBucket
+      PolicyDocument:
+        Statement:
+          - Action: 's3:PutObject'
+            Effect: Allow
+            Resource: !Join
+              - ''
+              - - !GetAtt S3LogBucket.Arn
+                - '/*'
+            Principal: 
+              AWS: !Sub 
+                - "arn:aws:iam::${ELBAccountID}:root"
+                - ELBAccountID: !FindInMap
+                  - RegionMap
+                  - !Ref 'AWS::Region'
+                  - ELBAccountID
+          - Action: 's3:PutObject'
+            Effect: Allow
+            Resource: !Join
+              - ''
+              - - !GetAtt S3LogBucket.Arn
+                - '/*'
+            Principal: 
+              Service: 'delivery.logs.amazonaws.com'
+            Condition:
+              StringEquals:
+                's3:x-amz-acl': 'bucket-owner-full-control'
+          - Action: 's3:GetBucketAcl'
+            Effect: Allow
+            Resource: !GetAtt S3LogBucket.Arn
+            Principal: 
+              Service: 'delivery.logs.amazonaws.com'
+  PublicHWebSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: Public HTTP/S Access
+      GroupName: !Join 
+        - '-'
+        - - !Ref AWS::StackName
+          - 'PublicHWebSecurityGroup'
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow inbound HTTP traffic
+          FromPort: 80
+          ToPort: 80
+          IpProtocol: tcp
+        - CidrIp: 0.0.0.0/0
+          Description: Allow inbound HTTP traffic
+          FromPort: 443
+          ToPort: 443
+          IpProtocol: tcp
+      VpcId: 
+        Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, "VPCID"]]
+  ElasticLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties: 
+      IpAddressType: ipv4
+      LoadBalancerAttributes: 
+        - Key: access_logs.s3.enabled
+          Value: !Ref S3LogsEnabled
+        - !If
+          - EnableS3Logs
+          - Key: access_logs.s3.bucket
+            Value: !Ref S3LogBucket
+          - !Ref 'AWS::NoValue'
+      Name: !Join 
+        - '-'
+        - - 'ELB'
+          - !Ref ApplicationName
+      Scheme: !Ref ELBScheme
+      SecurityGroups: 
+        - !Ref PublicHWebSecurityGroup
+        - Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, "DefaultSG"]]
+      Subnets: 
+        - !If
+          - Subnet0
+          - Fn::ImportValue:
+              !Sub 
+                - "${VPCStackName}-${SubnetExportName}"
+                - SubnetExportName: !Select [ 0, !Ref ELBSubnets ] 
+          - !Ref 'AWS::NoValue'
+        - !If
+          - Subnet1
+          - Fn::ImportValue:
+              !Sub 
+                - "${VPCStackName}-${SubnetExportName}"
+                - SubnetExportName: !Select [ 1, !Ref ELBSubnets ]
+          - !Ref 'AWS::NoValue'
+        - !If
+          - Subnet2
+          - Fn::ImportValue:
+              !Sub 
+                - "${VPCStackName}-${SubnetExportName}"
+                - SubnetExportName: !Select [ 2, !Ref ELBSubnets ]
+          - !Ref 'AWS::NoValue'
+        - !If
+          - Subnet3
+          - Fn::ImportValue:
+              !Sub 
+                - "${VPCStackName}-${SubnetExportName}"
+                - SubnetExportName: !Select [ 3, !Ref ELBSubnets ]
+          - !Ref 'AWS::NoValue'
+        - !If
+          - Subnet4
+          - Fn::ImportValue:
+              !Sub 
+                - "${VPCStackName}-${SubnetExportName}"
+                - SubnetExportName: !Select [ 4, !Ref ELBSubnets ]
+          - !Ref 'AWS::NoValue'
+        - !If
+          - Subnet5
+          - Fn::ImportValue:
+              !Sub 
+                - "${VPCStackName}-${SubnetExportName}"
+                - SubnetExportName: !Select [ 5, !Ref ELBSubnets ]
+          - !Ref 'AWS::NoValue'
+      Type: !Ref ELBType
+  HTTPListener:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties:
+      DefaultActions:
+        - Order: 1
+          Type: "redirect"
+          RedirectConfig:
+            Protocol: "HTTPS"
+            Port: "443"
+            Host: "#{host}"
+            Path: "/#{path}"
+            Query: "#{query}"
+            StatusCode: "HTTP_301"
+      LoadBalancerArn: !Ref ElasticLoadBalancer
+      Port: 80
+      Protocol: "HTTP"
+  HTTPSListener:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Condition: HasSSLCertificate
+    Properties:
+      LoadBalancerArn: !Ref ElasticLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS-1-2-Ext-2018-06
+      Certificates:
+        - CertificateArn: 
+            Fn::ImportValue: !Join [ "-", [ !Ref CertStacName, "CertificateArn"]]
+      DefaultActions:
+        - Order: 1
+          Type: forward
+          TargetGroupArn: !Ref ELBTargetGroup
+  ELBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: !If
+        - EnableHealthCheckCondition
+        - true
+        - false
+      HealthCheckPath: !If
+        - EnableHealthCheckCondition
+        - !Ref HealthCheckPath
+        - !Ref AWS::NoValue
+      Name: !Join 
+        - '-'
+        - - 'TargetGroup'
+          - !Ref ApplicationName
+      TargetType: instance
+      Protocol: HTTP
+      Port: 80
+      TargetGroupAttributes:
+        - Key: stickiness.enabled
+          Value: !Ref ELBSessionStickinessEnabled
+        - !If 
+          - ELBSessionStickinessEnabledCondition
+          - !If 
+            - IsApplicationLoadBalancerCondition
+            - Key: stickiness.type
+              Value: lb_cookie
+            - Key: stickiness.type
+              Value: source_ip
+          - !Ref 'AWS::NoValue'
+      VpcId:
+        Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, "VPCID"]]
+Outputs:
+  ElasticLoadBalancerARN:
+    Value: !Ref ElasticLoadBalancer
+    Description: ELB ARN
+    Export:
+      Name: !Sub '${AWS::StackName}-ElasticLoadBalancerARN'
+  ElasticLoadBalancerDNS:
+    Value: !GetAtt ElasticLoadBalancer.DNSName
+    Description: ELB DNS Name
+    Export:
+      Name: !Sub '${AWS::StackName}-ElasticLoadBalancerDNS'
+  TargetGroupARN:
+    Value: !Ref ELBTargetGroup
+    Description: Target Group ARN
+    Export:
+      Name: !Sub '${AWS::StackName}-TargetGroupARN'
+  HealthCheckPath:
+    Value: !Ref HealthCheckPath
+    Description: Health Check Path
+    Export:
+      Name: !Sub '${AWS::StackName}-HealthCheckPath'

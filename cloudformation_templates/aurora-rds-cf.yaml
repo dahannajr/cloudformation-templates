@@ -1,0 +1,811 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "AWS RDS / Aurora"
+Metadata:
+  LICENSE: Apache License Version 2.0
+Parameters:
+  DBAllocatedStorageEncrypted:
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Whether or not to encrypt the database.
+    Type: String
+  DBAllocatedStorage:
+    Default: "50"
+    Description: The size of the database (GiB)
+    Type: Number
+    MinValue: "20"
+    MaxValue: "65536"
+    ConstraintDescription: must be between 20 and 65536 GiB.
+  KmsKeyId:
+    Description: The ID of an existing KMS key if the DB is to be encrypted and a new key is not to be created.
+    Default: ""
+    Type: String
+  DBCWLogExports:
+    Type: CommaDelimitedList
+    Default: ""
+    Description: "Specify comma delimited list of Database logs ( error, slowquery, audit ) to export to CloudWatch Logs."
+  RotateDBPassword:
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Whether or not to rotate the database password on a schedule (every 89 days).
+    Type: String
+  DBAutoMinorVersionUpgrade:
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "false"
+    Description: "Select true to enable auto minor version upgrade."
+    Type: String
+  DBBackupRetentionPeriod:
+    Default: 35
+    Description: "The number of days for which automatic database snapshots are retained from 1 to 35 days."
+    Type: Number
+    MinValue: 1
+    MaxValue: 35
+  DBEngineVersion:
+    Description: Select Database Engine Version
+    Type: String
+    AllowedValues:
+      - "Aurora-MySQL5.6"
+      - "Aurora-MySQL5.7"
+      - "Aurora-PostgreSQL11.6"
+      - "Aurora-PostgreSQL10.12"
+      - "RDS-MySQL8.0"
+      - "RDS-SQLServerExpress-15"
+  DBEngineMode:
+    Description: The engine mode of the cluster. Currently Aurora Serverless, Global Database and Multi-Master is available for Aurora-MySQL5.6.10a. Aurora Parallel Query is available for Aurora MySQL5.6-x versions.
+    Type: String
+    Default: "provisioned"
+    AllowedValues:
+      - "rds"
+      - "provisioned"
+      - "parallelquery"
+      - "serverless"
+      - "global"
+      - "multimaster"
+  DBInstanceClass:
+    AllowedValues:
+      - db.r5.12xlarge
+      - db.r5.4xlarge
+      - db.r5.2xlarge
+      - db.r5.xlarge
+      - db.r5.large
+      - db.r4.16xlarge
+      - db.r4.8xlarge
+      - db.r4.4xlarge
+      - db.r4.2xlarge
+      - db.r4.xlarge
+      - db.r4.large
+      - db.m5.xlarge
+      - db.t3.medium
+      - db.t3.large
+      - ""
+    ConstraintDescription: "Must select a valid database instance type."
+    Default: ""
+    Description: "The name of the compute and memory capacity class of the database instance. Not Applicable for Aurora Serverless. Supported instance types for Aurora Multi-Master is db.r4.[2/4/8]xlarge only currently."
+    Type: String
+  DBAccessCIDR:
+    AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/([0-9]|[1-2][0-9]|3[0-2]))$"
+    ConstraintDescription: "CIDR block parameter must be in the form x.x.x.x/x"
+    Description: "Allowed CIDR block for external access (use VPC CIDR)."
+    Type: String
+    Default: 10.0.0.0/16
+  DBSnapshotIdentifier:
+    Description: "ARN if restoring from a manual snapshot"
+    Type: String
+    Default: ""
+  DBMasterUserPassword:
+    AllowedPattern: ^(?=^.{8,255}$)(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])(?!.*[@/"']).*$
+    ConstraintDescription: 'Min 8 chars. Must include 1 uppercase, 1 lowercase, 1 number, 1 (non / @ " '') symbol'
+    Description: 'The database admin account password.Min 8 chars. Must include 1 uppercase, 1 lowercase, 1 number, 1 (non / @ " '') symbol.'
+    MaxLength: "64"
+    MinLength: "8"
+    NoEcho: "True"
+    Type: String
+  DBMasterUsername:
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    ConstraintDescription: "Must begin with a letter and contain only alphanumeric characters."
+    Default: msadmin
+    Description: "The database admin account username."
+    MaxLength: "16"
+    MinLength: "1"
+    Type: String
+  DBPort:
+    Default: 3306
+    Description: "The port on which the DB instance will listen for connections. Aurora Serverless currently supports port 3306 only."
+    Type: Number
+    ConstraintDescription: "Must be in the range [1150-65535]."
+    MinValue: 1150
+    MaxValue: 65535
+  DBName:
+    Default: "AuroraMySQLDB"
+    Description: "Name of the Amazon Aurora database."
+    MaxLength: "63"
+    MinLength: "0"
+    Type: String
+  MonitoringInterval:
+    Default: 0
+    Type: String
+    Description: The interval, in seconds, between points when Enhanced Monitoring metrics are collected for the DB instance.
+  CustomDBSecurityGroup:
+    Description: "ID of the security group (e.g., sg-0234se). One will be created for you if left empty."
+    Type: String
+    Default: ""
+  EnvironmentStage:
+    Type: String
+    Description: Designates the environment stage of the associated AWS resource. (Optional)
+    AllowedValues:
+      - dev
+      - test
+      - pre-prod
+      - prod
+      - none
+    Default: none
+  Confidentiality:
+    Type: String
+    Default: ""
+    Description: Designates the confidentiality classification of the data that is associated with the resource. (Optional)
+    AllowedValues:
+      - public
+      - private
+      - confidential
+      - pii/phi
+      - ""
+  Compliance:
+    Type: String
+    Default: ""
+    Description: Designates the compliance level for the AWS resource. (Optional)
+    AllowedValues:
+      - hipaa
+      - sox
+      - fips
+      - other
+      - ""
+  ServerlessMinCapacityUnit:
+    Description: The minimum capacity for an Aurora DB cluster in serverless DB engine mode. The minimum capacity must be less than or equal to the maximum capacity.
+    Type: String
+    Default: "2"
+    AllowedValues:
+      - "1"
+      - "2"
+      - "4"
+      - "8"
+      - "16"
+      - "32"
+      - "64"
+      - "128"
+      - "256"
+      - ""
+  ServerlessMaxCapacityUnit:
+    Description: The maximum capacity for an Aurora DB cluster in serverless DB engine mode. The maximum capacity must be greater than or equal to the minimum capacity.
+    Type: String
+    Default: "64"
+    AllowedValues:
+      - "1"
+      - "2"
+      - "4"
+      - "8"
+      - "16"
+      - "32"
+      - "64"
+      - "128"
+      - "256"
+      - ""
+  ServerlessAutoPause:
+    Description: Specifies whether to allow or disallow automatic pause for an Aurora DB cluster in serverless DB engine mode. A DB cluster can be paused only when its idle (it has no connections).
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+      - ""
+  ServerlessSecondsUntilAutoPause:
+    Description: The time, in seconds, before an Aurora DB cluster in serverless mode is auto paused. Min = 300, Max = 86400 (24hrs)
+    Type: Number
+    Default: 300
+    MaxValue: 86400
+    MinValue: 300
+  VPCStackName:
+    Description: The value used for the name tag of the bastion host
+    Type: String
+  ApplicationVersion:
+    Type: String
+    Default: ""
+  ProjectCostCenter:
+    Type: String
+    Default: ""
+  ApplicationName:
+    Type: String
+    Default: ""
+  NotificationList:
+    Type: String
+    Default: ""
+  DBOptionsGroupName:
+    Type: String
+    Default: ""
+  DBOptionsGroupStack:
+    Type: String
+    Default: ""
+Mappings:
+  DBFamilyMap:
+    "Aurora-MySQL5.6":
+      "family": "aurora5.6"
+      "engineversion": "5.6.mysql_aurora.1.23.0"
+      "engine": "aurora"
+      "enginefamily": "MYSQL"
+      "cloudwatchlogexports": ""
+    "Aurora-MySQL5.7":
+      # aws rds describe-db-engine-versions --query "DBEngineVersions[].DBParameterGroupFamily"
+      "family": "aurora-mysql5.7"
+      # aws rds describe-db-engine-versions --engine aurora-mysql --query "DBEngineVersions[].EngineVersion"
+      "engineversion": "5.7.mysql_aurora.2.09.1"
+      "engine": "aurora-mysql"
+      "enginefamily": "MYSQL"
+      "cloudwatchlogexports": ""
+    "RDS-MySQL8.0":
+      "family": "mysql8.0"
+      "engineversion": "8.0.20"
+      "engine": "mysql"
+      "enginefamily": "MYSQL"
+      "cloudwatchlogexports": "error,slowquery"
+    "Aurora-PostgreSQL10.12":
+      "family": "aurora-postgresql10"
+      "engineversion": "10.12"
+      "engine": "aurora-postgresql"
+      "enginefamily": "POSTGRES"
+      "cloudwatchlogexports": ""
+    "Aurora-PostgreSQL11.6":
+      "family": "aurora-postgresql11"
+      "engineversion": "11.6"
+      "enginename": "aurora-postgresql"
+      "enginefamily": "POSTGRES"
+      "cloudwatchlogexports": ""
+    "RDS-SQLServerExpress-15":
+      "family": ""
+      "engineversion": "15.00.4153.1.v1"
+      "enginename": "sqlserver-ex"
+      "engine": "sqlserver-ex"
+      "enginefamily": "sqlserver-ex-15.0"
+      "cloudwatchlogexports": "error"
+Conditions:
+  IsKMSKeyIdSuppliedCondition: !Not
+    - !Equals
+      - !Ref KmsKeyId
+      - ""
+  ShouldEncryptCondition: !Or
+    - !Condition IsKMSKeyIdSuppliedCondition
+    - !Equals
+      - !Ref DBAllocatedStorageEncrypted
+      - "true"
+  ShouldCreateEncryptionKey: !And
+    - !Equals
+      - !Ref DBAllocatedStorageEncrypted
+      - "true"
+    - !Equals
+      - !Ref KmsKeyId
+      - ""
+  IsEnhancedMonitoringEnabledCondition: !Not
+    - !Equals
+      - !Ref MonitoringInterval
+      - "0"
+  DBPasswordRotation: !Equals
+    - !Ref RotateDBPassword
+    - "true"
+  IsAuroraCondition: !Not
+    - !Equals
+      - !Ref DBEngineMode
+      - "rds"
+  IsRDSCondition: !Equals
+    - !Ref DBEngineMode
+    - "rds"
+  IsServerlessEnabled: !Equals
+    - !Ref DBEngineMode
+    - "serverless"
+  IsAuroraButServerlessDisabledCondition: !And
+    - !Not
+      - !Equals
+        - !Ref DBEngineMode
+        - "serverless"
+    - !Not
+      - !Condition IsRDSCondition
+  EnableIAMDBAuth: !Or
+    - !Equals
+      - !Ref DBEngineMode
+      - "provisioned"
+    - !Equals
+      - !Ref DBEngineMode
+      - "global"
+    - !Equals
+      - !Ref DBEngineMode
+      - "multimaster"
+  EnablePI: !And
+    - !Equals
+      - !Ref DBEngineMode
+      - "provisioned"
+    - !Equals
+      - !Ref DBEngineMode
+      - "global"
+  EnableBackTrack: !And
+    - !Equals
+      - !Ref DBEngineMode
+      - "provisioned"
+    - !Equals
+      - !FindInMap [DBFamilyMap, !Ref DBEngineVersion, "family"]
+      - "aurora5.6"
+  DoEnableCWLogExport:
+    !And [
+      !Not [!Equals [!Join ["", !Ref DBCWLogExports], ""]],
+      !Condition IsAuroraButServerlessDisabledCondition,
+    ]
+  DoCreateDatabase: !And
+    - !Not
+      - !Equals
+        - !Ref DBName
+        - ""
+    - !Not
+      - !Condition DoRestoreFromSnapshot
+  DoRestoreFromSnapshot: !Not
+    - !Equals
+      - !Ref DBSnapshotIdentifier
+      - ""
+  CreateDatabaseCondition: !Not
+    - !Condition DoRestoreFromSnapshot
+  HasDatabaseNameCondition: !And
+    - !Not
+      - !Equals
+        - !Ref DBName
+        - ""
+    - !Condition CreateDatabaseCondition
+  UseDatabaseEncryption: !Equals
+    - !Ref DBAllocatedStorageEncrypted
+    - true
+  CreateSecurityGroup: !Equals
+    - !Ref CustomDBSecurityGroup
+    - ""
+  IsMYSQLEngineCondition: !Equals
+    - !FindInMap [DBFamilyMap, !Ref DBEngineVersion, "enginefamily"]
+    - "MYSQL"
+  IsNotMYSQLCondition: !Not
+    - !Equals
+      - !FindInMap [DBFamilyMap, !Ref DBEngineVersion, "enginefamily"]
+      - "MYSQL"
+  HasDBOptionsGroupName: !Not
+    - !Equals
+      - !Ref DBOptionsGroupName
+      - ""
+  HasDBOptionsGroupStack: !Not
+    - !Equals
+      - !Ref DBOptionsGroupStack
+      - ""
+  HasDBOptionGroup: !Or
+    - !Condition HasDBOptionsGroupName
+    - !Condition HasDBOptionsGroupStack
+Resources:
+  MonitoringIAMRole:
+    Type: AWS::IAM::Role
+    Condition: IsEnhancedMonitoringEnabledCondition
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "monitoring.rds.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole
+  DBSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription:
+        - Endpoint: !Ref NotificationList
+          Protocol: email
+  EncryptionKey:
+    DeletionPolicy: Retain
+    Type: AWS::KMS::Key
+    Condition: ShouldCreateEncryptionKey
+    Properties:
+      KeyPolicy:
+        Version: 2012-10-17
+        Id: !Ref AWS::StackName
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS:
+                - !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "kms:*"
+            Resource: "*"
+          - Effect: Allow
+            Principal:
+              AWS: "*"
+            Action:
+              - "kms:Encrypt"
+              - "kms:Decrypt"
+              - "kms:ReEncrypt*"
+              - "kms:GenerateDataKey*"
+              - "kms:CreateGrant"
+              - "kms:ListGrants"
+              - "kms:DescribeKey"
+            Resource: "*"
+            Condition:
+              StringEquals:
+                "kms:CallerAccount": !Ref "AWS::AccountId"
+                "kms:ViaService": !Sub "rds.${AWS::Region}.amazonaws.com"
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+  EncryptionKeyAlias:
+    Type: AWS::KMS::Alias
+    Condition: ShouldCreateEncryptionKey
+    Properties:
+      AliasName: !Sub "alias/${AWS::StackName}"
+      TargetKeyId: !Ref EncryptionKey
+  RDSMasterDBInstance:
+    Type: "AWS::RDS::DBInstance"
+    Condition: IsRDSCondition
+    Properties:
+      AllocatedStorage: !Ref DBAllocatedStorage
+      AutoMinorVersionUpgrade: !Ref DBAutoMinorVersionUpgrade
+      CopyTagsToSnapshot: true
+      DBInstanceClass: !Ref DBInstanceClass
+      DBInstanceIdentifier: !Sub "rdsdb-${EnvironmentStage}-${ApplicationName}"
+      DBName: !If [DoRestoreFromSnapshot, !Ref "AWS::NoValue", !Ref DBName]
+      OptionGroupName: !If
+        - HasDBOptionGroup
+        - !If 
+          - HasDBOptionsGroupName
+          - !Ref DBOptionsGroupName
+          - Fn::ImportValue: !Join [ "-", [!Ref DBOptionsGroupStack, "RDSOptionGroupName"]]
+        - !Ref AWS::NoValue
+      DBSnapshotIdentifier:
+        !If [
+          DoRestoreFromSnapshot,
+          !Ref DBSnapshotIdentifier,
+          !Ref "AWS::NoValue",
+        ]
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      EnableCloudwatchLogsExports:
+        !Split [
+          ",",
+          !FindInMap [
+            DBFamilyMap,
+            !Ref DBEngineVersion,
+            "cloudwatchlogexports",
+          ],
+        ]
+      EnablePerformanceInsights: !If [EnablePI, true, !Ref "AWS::NoValue"]
+      Engine: !FindInMap [DBFamilyMap, !Ref DBEngineVersion, "engine"]
+      EngineVersion:
+        !FindInMap [DBFamilyMap, !Ref DBEngineVersion, "engineversion"]
+      KmsKeyId: !If
+        - ShouldEncryptCondition
+        - !If
+          - IsKMSKeyIdSuppliedCondition
+          - !Ref KmsKeyId
+          - !GetAtt EncryptionKey.Arn
+        - !Ref AWS::NoValue
+      MasterUsername:
+        !If [DoRestoreFromSnapshot, !Ref "AWS::NoValue", !Ref DBMasterUsername]
+      MasterUserPassword:
+        !If [
+          DoRestoreFromSnapshot,
+          !Ref "AWS::NoValue",
+          !Ref DBMasterUserPassword,
+        ]
+      MonitoringInterval: !Ref MonitoringInterval
+      MonitoringRoleArn:
+        !If [
+          IsEnhancedMonitoringEnabledCondition,
+          !GetAtt MonitoringIAMRole.Arn,
+          !Ref AWS::NoValue,
+        ]
+      PubliclyAccessible: false
+      StorageEncrypted: !If [ShouldEncryptCondition, "true", "false"]
+      StorageType: gp2
+      VPCSecurityGroups:
+        - !If [
+            CreateSecurityGroup,
+            !Ref RDSSecurityGroup,
+            !Ref CustomDBSecurityGroup,
+          ]
+      Tags:
+        - Key: Name
+          Value: !Sub RDSDB-${AWS::StackName}
+        - Key: EnvironmentStage
+          Value: !Ref EnvironmentStage
+        - Key: Application
+          Value: !Ref ApplicationName
+        - Key: ApplicationVersion
+          Value: !Ref ApplicationVersion
+        - Key: ProjectCostCenter
+          Value: !Ref ProjectCostCenter
+        - Key: Confidentiality
+          Value: !Ref Confidentiality
+        - Key: Compliance
+          Value: !Ref Compliance
+  RDSDBClusterParameterGroup:
+    Type: AWS::RDS::DBClusterParameterGroup
+    Condition: IsAuroraCondition
+    Properties:
+      Description:
+        !Join [
+          "- ",
+          [
+            "Aurora Cluster Parameter Group for Cloudformation Stack ",
+            !Ref DBName,
+          ],
+        ]
+      Family: !FindInMap [DBFamilyMap, !Ref DBEngineVersion, "family"]
+      Parameters:
+        time_zone: !If
+          - IsMYSQLEngineCondition
+          - UTC
+          - Ref: AWS::NoValue
+        performance_schema: !If
+          - IsMYSQLEngineCondition
+          - 1
+          - Ref: AWS::NoValue
+        timezone: !If
+          - IsNotMYSQLCondition
+          - UTC
+          - Ref: AWS::NoValue
+  DBCluster:
+    Type: "AWS::RDS::DBCluster"
+    Condition: IsAuroraCondition
+    Properties:
+      BackupRetentionPeriod: !Ref DBBackupRetentionPeriod
+      DBClusterIdentifier: !Sub "aurora-${ApplicationName}-${AWS::StackName}"
+      DBClusterParameterGroupName: !Ref RDSDBClusterParameterGroup
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      DatabaseName: !If
+        - DoCreateDatabase
+        - !Ref DBName
+        - !Ref AWS::NoValue
+      Engine: !FindInMap [DBFamilyMap, !Ref DBEngineVersion, "engine"]
+      EngineVersion:
+        !FindInMap [DBFamilyMap, !Ref DBEngineVersion, "engineversion"]
+      EngineMode: !Ref DBEngineMode
+      ScalingConfiguration: !If
+        - IsServerlessEnabled
+        - AutoPause: !Ref ServerlessAutoPause
+          MaxCapacity: !Ref ServerlessMaxCapacityUnit
+          MinCapacity: !Ref ServerlessMinCapacityUnit
+          SecondsUntilAutoPause: !Ref ServerlessSecondsUntilAutoPause
+        - !Ref AWS::NoValue
+      KmsKeyId: !If
+        - ShouldEncryptCondition
+        - !If
+          - IsKMSKeyIdSuppliedCondition
+          - !Ref KmsKeyId
+          - !GetAtt EncryptionKey.Arn
+        - !Ref AWS::NoValue
+      MasterUserPassword:
+        !If [
+          DoRestoreFromSnapshot,
+          !Ref "AWS::NoValue",
+          !Ref DBMasterUserPassword,
+        ]
+      MasterUsername:
+        !If [DoRestoreFromSnapshot, !Ref "AWS::NoValue", !Ref DBMasterUsername]
+      SnapshotIdentifier:
+        !If [
+          DoRestoreFromSnapshot,
+          !Ref DBSnapshotIdentifier,
+          !Ref "AWS::NoValue",
+        ]
+      Port: !If
+        - IsServerlessEnabled
+        - !Ref AWS::NoValue
+        - !Ref DBPort
+      StorageEncrypted:
+        !If [
+          UseDatabaseEncryption,
+          !Ref DBAllocatedStorageEncrypted,
+          !Ref "AWS::NoValue",
+        ]
+      EnableIAMDatabaseAuthentication:
+        !If [EnableIAMDBAuth, true, !Ref "AWS::NoValue"]
+      BacktrackWindow: !If [EnableBackTrack, 259200, !Ref "AWS::NoValue"]
+      EnableCloudwatchLogsExports:
+        !If [DoEnableCWLogExport, !Ref DBCWLogExports, !Ref "AWS::NoValue"]
+      Tags:
+        - Key: Name
+          Value: !Sub AuroraDB-${AWS::StackName}
+        - Key: EnvironmentStage
+          Value: !Ref EnvironmentStage
+        - Key: Application
+          Value: !Ref ApplicationName
+        - Key: ApplicationVersion
+          Value: !Ref ApplicationVersion
+        - Key: ProjectCostCenter
+          Value: !Ref ProjectCostCenter
+        - Key: Confidentiality
+          Value: !Ref Confidentiality
+        - Key: Compliance
+          Value: !Ref Compliance
+      VpcSecurityGroupIds: !If
+        - CreateSecurityGroup
+        - [!Ref RDSSecurityGroup]
+        - [!Ref CustomDBSecurityGroup]
+    UpdateReplacePolicy: Snapshot
+  DBSubnetGroup:
+    Type: "AWS::RDS::DBSubnetGroup"
+    Properties:
+      DBSubnetGroupDescription: "Subnets available for the Amazon Aurora database instance"
+      SubnetIds:
+        - Fn::ImportValue: !Join ["-", [!Ref VPCStackName, "PrivateSubnet1BID"]]
+        - Fn::ImportValue: !Join ["-", [!Ref VPCStackName, "PrivateSubnet2BID"]]
+  RDSSecurityGroup:
+    Condition: CreateSecurityGroup
+    Properties:
+      GroupDescription: "Allow access to database port"
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: -1
+          IpProtocol: "-1"
+          ToPort: -1
+      SecurityGroupIngress:
+        - CidrIp: !Ref DBAccessCIDR
+          FromPort: !Ref DBPort
+          IpProtocol: tcp
+          ToPort: !Ref DBPort
+      VpcId:
+        Fn::ImportValue: !Join ["-", [!Ref VPCStackName, "VPCID"]]
+      Tags:
+        - Key: Name
+          Value: !Sub RDSSecurityGroup-${AWS::StackName}
+    Type: "AWS::EC2::SecurityGroup"
+  RDSSecurityGroupIngress:
+    Condition: CreateSecurityGroup
+    Properties:
+      GroupId: !GetAtt "RDSSecurityGroup.GroupId"
+      IpProtocol: "-1"
+      SourceSecurityGroupId: !Ref RDSSecurityGroup
+      Description: "Self Reference"
+    Type: "AWS::EC2::SecurityGroupIngress"
+  CPUUtilizationAlarm1:
+    Type: "AWS::CloudWatch::Alarm"
+    Condition: IsRDSCondition
+    Properties:
+      ActionsEnabled: true
+      AlarmActions:
+        - Ref: DBSNSTopic
+      AlarmDescription: "CPU_Utilization"
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value:
+            Ref: RDSMasterDBInstance
+      MetricName: CPUUtilization
+      Statistic: Maximum
+      Namespace: "AWS/RDS"
+      Threshold: 80
+      Unit: Percent
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      Period: 60
+      EvaluationPeriods: 5
+      TreatMissingData: "notBreaching"
+  FreeLocalStorageAlarm1:
+    Type: "AWS::CloudWatch::Alarm"
+    Condition: IsRDSCondition
+    Properties:
+      ActionsEnabled: true
+      AlarmActions:
+        - Ref: DBSNSTopic
+      AlarmDescription: "Free Local Storage"
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value:
+            Ref: RDSMasterDBInstance
+      MetricName: "FreeLocalStorage"
+      Statistic: Average
+      Namespace: "AWS/RDS"
+      Threshold: 5368709120
+      Unit: Bytes
+      ComparisonOperator: "LessThanOrEqualToThreshold"
+      Period: 60
+      EvaluationPeriods: 5
+      TreatMissingData: "notBreaching"
+  FreeableMemoryAlarm1:
+    Type: "AWS::CloudWatch::Alarm"
+    Condition: IsRDSCondition
+    Properties:
+      ActionsEnabled: true
+      AlarmActions:
+        - Ref: DBSNSTopic
+      AlarmDescription: "Freeable Memory"
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value:
+            Ref: RDSMasterDBInstance
+      MetricName: "FreeableMemory"
+      Statistic: Average
+      Namespace: "AWS/RDS"
+      Threshold: 2147483648
+      Unit: Bytes
+      ComparisonOperator: "LessThanOrEqualToThreshold"
+      Period: 60
+      EvaluationPeriods: 5
+      TreatMissingData: "notBreaching"
+  DatabaseClusterEventSubscription:
+    Type: "AWS::RDS::EventSubscription"
+    Condition: IsAuroraCondition
+    Properties:
+      EventCategories:
+        - failover
+        - failure
+        - notification
+      SnsTopicArn: !Ref DBSNSTopic
+      SourceIds: [!Ref DBCluster]
+      SourceType: "db-cluster"
+  DatabaseInstanceEventSubscription:
+    Type: "AWS::RDS::EventSubscription"
+    Condition: IsRDSCondition
+    Properties:
+      EventCategories:
+        - availability
+        - configuration change
+        - deletion
+        - failover
+        - failure
+        - maintenance
+        - notification
+        - recovery
+      SnsTopicArn: !Ref DBSNSTopic
+      SourceIds:
+        - !Ref RDSMasterDBInstance
+      SourceType: "db-instance"
+Outputs:
+  RDSSecurityGroupId:
+    Condition: CreateSecurityGroup
+    Description: "RDS Security Group created for DB Access"
+    Value:  !GetAtt RDSSecurityGroup.GroupId
+    Export:
+      Name: !Sub "${AWS::StackName}-RDSSecurityGroupId"
+  DBName:
+    Description: "Amazon Aurora database name"
+    Value: !Ref DBName
+    Condition: HasDatabaseNameCondition
+    Export:
+      Name: !Sub "${AWS::StackName}-DBName"
+  DBClusterWriterEndpoint:
+    Condition: IsAuroraCondition
+    Description: "Amazon Aurora Cluster/Writer endpoint"
+    Value: !Sub ${DBCluster.Endpoint.Address}
+    Export:
+      Name: !Sub "${AWS::StackName}-DBClusterWriterEndpoint"
+  DBClusterReaderEndpoint:
+    Condition: IsAuroraButServerlessDisabledCondition
+    Description: "Amzon Aurora Reader Endpoint"
+    Value: !Sub ${DBCluster.ReadEndpoint.Address}
+    Export:
+      Name: !Sub "${AWS::StackName}-DBClusterReaderEndpoint"
+  AuroraClusterPort:
+    Condition: IsAuroraCondition
+    Description: "Amazon Aurora Endpoint port"
+    Value: !Sub ${DBCluster.Endpoint.Port}
+    Export:
+      Name: !Sub "${AWS::StackName}-AuroraClusterPort"
+  AuroraClusterFullEndpoint:
+    Condition: IsAuroraCondition
+    Description: "Full Amazon Aurora Cluster endpoint with port and database name"
+    Value: !Sub ${DBCluster.Endpoint.Address}:${DBCluster.Endpoint.Port}/${DBName}
+    Export:
+      Name: !Sub "${AWS::StackName}-AuroraClusterFullEndpoint"
+  AuroraMasterUsername:
+    Condition: CreateDatabaseCondition
+    Description: "Amazon Aurora Master username"
+    Value: !Ref DBMasterUsername
+    Export:
+      Name: !Sub "${AWS::StackName}-AuroraMasterUsername"
+  AuroraEncryptionKey:
+    Condition: ShouldCreateEncryptionKey
+    Description: "The alias of the KMS encryption key used for storage and Performance Insights data encryption"
+    Value: !Ref EncryptionKeyAlias
+    Export:
+      Name: !Sub "${AWS::StackName}-AuroraEncryptionKey"

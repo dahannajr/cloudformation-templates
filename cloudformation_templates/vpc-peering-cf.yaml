@@ -1,0 +1,332 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create a VPC and a VPC Peering connection using the PeerRole to accept.
+Parameters:
+  Peer1VPCStackName:
+    Type: String
+    Description: Stack name used to create the primary VPC
+  Peer2VPCStackName:
+    Type: String
+    Description: Stack name used to create the peering VPC
+  Peer1RouteTable1ID:
+    Type: String
+    Description: ID of a route table to out the peering connection
+    Default: ''
+  Peer1RouteTable2ID:
+    Type: String
+    Description: ID of a route table to out the peering connection
+    Default: ''
+  Peer1RouteTable3ID:
+    Type: String
+    Description: ID of a route table to out the peering connection
+    Default: ''
+  Peer1RouteTable4ID:
+  Peer1RouteTable4ID:
+    Type: String
+    Description: ID of a route table to out the peering connection
+    Default: ''
+  Peer1RouteTable5ID:
+    Type: String
+    Description: ID of a route table to out the peering connection
+    Default: ''
+  Peer1RouteTable6ID:
+    Type: String
+    Description: ID of a route table to out the peering connection
+    Default: ''
+  Peer1RouteTable7ID:
+    Type: String
+    Description: ID of a route table to out the peering connection
+    Default: ''
+  Peer1RouteTable8ID:
+    Type: String
+    Description: ID of a route table to out the peering connection
+    Default: ''
+  Peer1RouteTable9ID:
+    Type: String
+    Description: ID of a route table to out the peering connection
+    Default: ''
+  Peer2RouteTable1ID:
+    Type: String
+    Description: ID of a route table to out the peering connection
+    Default: ''
+  Peer2RouteTable2ID:
+    Type: String
+    Description: ID of a route table to out the peering connection
+    Default: ''
+  Peer2RouteTable3ID:
+    Type: String
+    Description: ID of a route table to out the peering connection
+    Default: ''
+  Peer2RouteTable4ID:
+    Type: String
+    Description: ID of a route table to out the peering connection
+    Default: ''
+  Peer2RouteTable5ID:
+    Type: String
+    Description: ID of a route table to out the peering connection
+    Default: ''
+  Peer2RouteTable6ID:
+    Type: String
+    Description: ID of a route table to out the peering connection
+    Default: ''
+  Peer2RouteTable7ID:
+    Type: String
+    Description: ID of a route table to out the peering connection
+    Default: ''
+  Peer2RouteTable8ID:
+    Type: String
+    Description: ID of a route table to out the peering connection
+    Default: ''
+  Peer2RouteTable9ID:
+    Type: String
+    Description: ID of a route table to out the peering connection
+    Default: ''
+Conditions:
+  Peer1RouteTable1Condition: !Not
+    - !Equals
+      - !Ref Peer1RouteTable1ID
+      - ''
+  Peer1RouteTable2Condition: !Not
+    - !Equals
+      - !Ref Peer1RouteTable2ID
+      - ''
+  Peer1RouteTable3Condition: !Not
+    - !Equals
+      - !Ref Peer1RouteTable3ID
+      - ''
+  Peer1RouteTable4Condition: !Not
+    - !Equals
+      - !Ref Peer1RouteTable4ID
+      - ''
+  Peer1RouteTable5Condition: !Not
+    - !Equals
+      - !Ref Peer1RouteTable5ID
+      - ''
+  Peer1RouteTable6Condition: !Not
+    - !Equals
+      - !Ref Peer1RouteTable6ID
+      - ''
+  Peer1RouteTable7Condition: !Not
+    - !Equals
+      - !Ref Peer1RouteTable7ID
+      - ''
+  Peer1RouteTable8Condition: !Not
+    - !Equals
+      - !Ref Peer1RouteTable8ID
+      - ''
+  Peer1RouteTable9Condition: !Not
+    - !Equals
+      - !Ref Peer1RouteTable9ID
+      - ''
+  Peer2RouteTable1Condition: !Not
+    - !Equals
+      - !Ref Peer2RouteTable1ID
+      - ''
+  Peer2RouteTable2Condition: !Not
+    - !Equals
+      - !Ref Peer2RouteTable2ID
+      - ''
+  Peer2RouteTable3Condition: !Not
+    - !Equals
+      - !Ref Peer2RouteTable3ID
+      - ''
+  Peer2RouteTable4Condition: !Not
+    - !Equals
+      - !Ref Peer2RouteTable4ID
+      - ''
+  Peer2RouteTable5Condition: !Not
+    - !Equals
+      - !Ref Peer2RouteTable5ID
+      - ''
+  Peer2RouteTable6Condition: !Not
+    - !Equals
+      - !Ref Peer2RouteTable6ID
+      - ''
+  Peer2RouteTable7Condition: !Not
+    - !Equals
+      - !Ref Peer2RouteTable7ID
+      - ''
+  Peer2RouteTable8Condition: !Not
+    - !Equals
+      - !Ref Peer2RouteTable8ID
+      - ''
+  Peer2RouteTable9Condition: !Not
+    - !Equals
+      - !Ref Peer2RouteTable9ID
+      - ''
+Resources:
+  VpcPeeringConnection:
+    Type: 'AWS::EC2::VPCPeeringConnection'
+    Properties:
+      VpcId: 
+        Fn::ImportValue:
+          !Join ['-', [!Ref Peer1VPCStackName, "VPCID"]]
+      PeerVpcId: 
+        Fn::ImportValue:
+          !Join ['-', [!Ref Peer2VPCStackName, "VPCID"]]
+  Peer1RouteTable1Route:
+    Type: AWS::EC2::Route
+    Condition: Peer1RouteTable1Condition
+    Properties:
+      RouteTableId: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer1VPCStackName, !Ref Peer1RouteTable1ID]]
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer2VPCStackName, "VPCCIDR"]]
+      VpcPeeringConnectionId: !Ref VpcPeeringConnection
+  Peer1RouteTable2Route:
+    Type: AWS::EC2::Route
+    Condition: Peer1RouteTable2Condition
+    Properties:
+      RouteTableId: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer1VPCStackName, !Ref Peer1RouteTable2ID]]
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer2VPCStackName, "VPCCIDR"]]
+      VpcPeeringConnectionId: !Ref VpcPeeringConnection
+  Peer1RouteTable3Route:
+    Type: AWS::EC2::Route
+    Condition: Peer1RouteTable3Condition
+    Properties:
+      RouteTableId: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer1VPCStackName, !Ref Peer1RouteTable3ID]]
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer2VPCStackName, "VPCCIDR"]]
+      VpcPeeringConnectionId: !Ref VpcPeeringConnection
+  Peer1RouteTable4Route:
+    Type: AWS::EC2::Route
+    Condition: Peer1RouteTable4Condition
+    Properties:
+      RouteTableId: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer1VPCStackName, !Ref Peer1RouteTable4ID]]
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer2VPCStackName, "VPCCIDR"]]
+      VpcPeeringConnectionId: !Ref VpcPeeringConnection
+  Peer1RouteTable5Route:
+    Type: AWS::EC2::Route
+    Condition: Peer1RouteTable5Condition
+    Properties:
+      RouteTableId: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer1VPCStackName, !Ref Peer1RouteTable5ID]]
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer2VPCStackName, "VPCCIDR"]]
+      VpcPeeringConnectionId: !Ref VpcPeeringConnection
+  Peer1RouteTable6Route:
+    Type: AWS::EC2::Route
+    Condition: Peer1RouteTable6Condition
+    Properties:
+      RouteTableId: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer1VPCStackName, !Ref Peer1RouteTable6ID]]
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer2VPCStackName, "VPCCIDR"]]
+      VpcPeeringConnectionId: !Ref VpcPeeringConnection
+  Peer1RouteTable7Route:
+    Type: AWS::EC2::Route
+    Condition: Peer1RouteTable7Condition
+    Properties:
+      RouteTableId: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer1VPCStackName, !Ref Peer1RouteTable7ID]]
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer2VPCStackName, "VPCCIDR"]]
+      VpcPeeringConnectionId: !Ref VpcPeeringConnection
+  Peer1RouteTable8Route:
+    Type: AWS::EC2::Route
+    Condition: Peer1RouteTable8Condition
+    Properties:
+      RouteTableId: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer1VPCStackName, !Ref Peer1RouteTable8ID]]
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer2VPCStackName, "VPCCIDR"]]
+      VpcPeeringConnectionId: !Ref VpcPeeringConnection
+  Peer1RouteTable9Route:
+    Type: AWS::EC2::Route
+    Condition: Peer1RouteTable9Condition
+    Properties:
+      RouteTableId: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer1VPCStackName, !Ref Peer1RouteTable9ID]]
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer2VPCStackName, "VPCCIDR"]]
+      VpcPeeringConnectionId: !Ref VpcPeeringConnection
+  Peer2RouteTable1Route:
+    Type: AWS::EC2::Route
+    Condition: Peer2RouteTable1Condition
+    Properties:
+      RouteTableId: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer2VPCStackName, !Ref Peer2RouteTable1ID]]
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer1VPCStackName, "VPCCIDR"]]
+      VpcPeeringConnectionId: !Ref VpcPeeringConnection
+  Peer2RouteTable2Route:
+    Type: AWS::EC2::Route
+    Condition: Peer2RouteTable2Condition
+    Properties:
+      RouteTableId: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer2VPCStackName, !Ref Peer2RouteTable2ID]]
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer1VPCStackName, "VPCCIDR"]]
+      VpcPeeringConnectionId: !Ref VpcPeeringConnection
+  Peer2RouteTable3Route:
+    Type: AWS::EC2::Route
+    Condition: Peer2RouteTable3Condition
+    Properties:
+      RouteTableId: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer2VPCStackName, !Ref Peer2RouteTable3ID]]
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer1VPCStackName, "VPCCIDR"]]
+      VpcPeeringConnectionId: !Ref VpcPeeringConnection
+  Peer2RouteTable4Route:
+    Type: AWS::EC2::Route
+    Condition: Peer2RouteTable4Condition
+    Properties:
+      RouteTableId: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer2VPCStackName, !Ref Peer2RouteTable4ID]]
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer1VPCStackName, "VPCCIDR"]]
+      VpcPeeringConnectionId: !Ref VpcPeeringConnection
+  Peer2RouteTable5Route:
+    Type: AWS::EC2::Route
+    Condition: Peer2RouteTable5Condition
+    Properties:
+      RouteTableId: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer2VPCStackName, !Ref Peer2RouteTable5ID]]
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer1VPCStackName, "VPCCIDR"]]
+      VpcPeeringConnectionId: !Ref VpcPeeringConnection
+  Peer2RouteTable6Route:
+    Type: AWS::EC2::Route
+    Condition: Peer2RouteTable6Condition
+    Properties:
+      RouteTableId: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer2VPCStackName, !Ref Peer2RouteTable6ID]]
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer1VPCStackName, "VPCCIDR"]]
+      VpcPeeringConnectionId: !Ref VpcPeeringConnection
+  Peer2RouteTable7Route:
+    Type: AWS::EC2::Route
+    Condition: Peer2RouteTable7Condition
+    Properties:
+      RouteTableId: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer2VPCStackName, !Ref Peer2RouteTable7ID]]
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer1VPCStackName, "VPCCIDR"]]
+      VpcPeeringConnectionId: !Ref VpcPeeringConnection
+  Peer2RouteTable8Route:
+    Type: AWS::EC2::Route
+    Condition: Peer2RouteTable8Condition
+    Properties:
+      RouteTableId: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer2VPCStackName, !Ref Peer2RouteTable8ID]]
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer1VPCStackName, "VPCCIDR"]]
+      VpcPeeringConnectionId: !Ref VpcPeeringConnection
+  Peer2RouteTable9Route:
+    Type: AWS::EC2::Route
+    Condition: Peer2RouteTable9Condition
+    Properties:
+      RouteTableId: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer2VPCStackName, !Ref Peer2RouteTable9ID]]
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Join ['-', [!Ref Peer1VPCStackName, "VPCCIDR"]]
+      VpcPeeringConnectionId: !Ref VpcPeeringConnection
+Outputs:
+  VPCPeeringConnectionId:
+    Value: !Ref VpcPeeringConnection
+    Export:
+      Name: !Sub '${AWS::StackName}-VPCPeeringConnectionId'

@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Test Lambda Function
+Resources: 
+  SendSMSMessageFunction:
+    Type: AWS::Lambda::Function
+    Metadata:
+      SamResourceId: SendSMSMessageFunction
+    Properties:
+      Code:
+        S3Bucket: aumentio-local-lambda-code-sms-messaging-us-east-1-000000000000
+        S3Key: SendSMSMessageFunction.zip
+      Description: Test an SMS text message via SNS
+      Handler: app.handler
+      MemorySize: 128
+      Role:
+        Fn::GetAtt:
+          - SendSMSMessageFunctionRole
+          - Arn
+      Runtime: nodejs14.x
+      Timeout: 10
+      Environment:
+        Variables:
+          ORIGINATION_NUMBER: "+18334482755"
+          NODE_TLS_REJECT_UNAUTHORIZED: 0
+      Tags:
+        - Key: lambda:createdBy
+          Value: SAM
+      Architectures:
+        - x86_64
+  SendSMSMessageFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole
+      Policies:
+        - PolicyName: SendSMSMessageFunctionRolePolicy1
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:*
+                  - pinpoint:*
+                  - sns:*
+                Resource:
+                  - "*"
+      Tags:
+        - Key: lambda:createdBy
+          Value: SAM
+  SendSMSMessageFunctionSQSEvent:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 1
+      EventSourceArn: arn:aws:sqs:us-east-1:000000000000:aumentio-local-sqs-process-customer-notification-sms-messaging-Queue
+      FunctionName: !Ref SendSMSMessageFunction

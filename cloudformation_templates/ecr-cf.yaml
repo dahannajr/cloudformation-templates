@@ -1,0 +1,25 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  This template registers an ECR Repository
+Parameters:
+  ServiceName:
+    Description: Name of service
+    Type: String
+Resources:
+  ECR:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub ${AWS::StackName}-${ServiceName}
+      ImageScanningConfiguration: 
+        ScanOnPush: "true"
+Outputs:
+  ECRName:
+    Value: !Ref ECR
+    Description: Name of the ECR Repository
+    Export: 
+      Name: !Sub '${AWS::StackName}-ECRName'
+  ECRARN:
+    Value: !GetAtt ECR.Arn
+    Description: ARN of the created ECR Repository
+    Export: 
+      Name: !Sub '${AWS::StackName}-ECRARN'

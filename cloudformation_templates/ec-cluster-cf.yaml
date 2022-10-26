@@ -1,0 +1,183 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  Creates an ElasticSearch clustomer
+Parameters:
+  VPCStackName:
+    Description: Name of the VPC Stack to deploy this clustomer in to
+    Type: String
+    Default: ''
+  AZMode:
+    Description: AZ Mode for the Elastic Cache clustomer
+    Type: String
+    Default: 'single-az'
+    AllowedValues:
+      - 'single-az'
+      - 'cross-az'
+  CacheEngine:
+    Description: The name of the cache engine to be used for this cluster.
+    Type: String
+    Default: memcached
+    AllowedValues:
+      - memcached
+      - redis
+  CacheNodeType:
+    Description: The compute and memory capacity of the nodes in the node group 
+    Type: String
+    Default: cache.t3.small
+  ComputeInstanceSecurityGroup:
+    Description: Source Security Group to be associated with the Cache inbound rule
+    Type: String
+    Default: ''
+  ClusterPort:
+    Description: The port number on which each of the cache nodes accepts connections.
+    Type: Number
+    Default: 11211
+  EC2SecurityGroupName:
+    Description: Name of the EC2 Security Group to include in the authorization.
+    Type: String
+    Default: ''
+  EngineVersion:
+    Description: The version number of the cache engine to be used for this cluster. 
+    Type: String
+    Default: ''
+  NumCacheNodes:
+    Description: The number of cache nodes that the cache cluster should have.
+    Type: Number
+    Default: 1
+  TagEnvironment:
+    Description: ElasticCache Environment
+    Type: String
+    AllowedValues:
+      - Dev
+      - Test
+      - Prod
+  TagCachePurpose:
+    Description: ElasticCache Purpose
+    Type: String
+    Default: ''
+Conditions:
+  DeployWithinVPCConstraint: !Not 
+    - !Equals 
+      - !Ref VPCStackName
+      - ''
+  DontDeployWithinVPCConstraint: !Equals 
+    - !Ref VPCStackName
+    - ''
+  MultiAZDeploymentContraint: !Equals 
+    - 'cross-az'
+    - !Ref AZMode
+  UseDefaultEngineVersionConstraint: !Equals 
+    - !Ref EngineVersion
+    - ''
+  IsMemcachedConstraint: !Equals 
+    - !Ref CacheEngine
+    - 'memcached'
+  IsRedisConstraint: !Equals 
+    - !Ref CacheEngine
+    - 'redis'
+Resources:
+  ECSubnetGroup:
+    Type: "AWS::ElastiCache::SubnetGroup"
+    Condition: DeployWithinVPCConstraint
+    Properties:
+      CacheSubnetGroupName: !Sub "${AWS::StackName}-${VPCStackName}-ECSubnetGroup"
+      Description: !Sub "${AWS::StackName}-${VPCStackName}-ECSubnetGroup"
+      SubnetIds: 
+        - Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, "PrivateSubnet1BID"]]
+        - Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, "PrivateSubnet2BID"]]
+  ECSecurityGroup:
+    Type: "AWS::ElastiCache::SecurityGroup"
+    Condition: DontDeployWithinVPCConstraint
+    Properties:
+      Description: !Sub "${AWS::StackName}-${VPCStackName}-ECSecurityGroup"
+  ECSecurityGroupIngress:
+    Type: "AWS::ElastiCache::SecurityGroupIngress"
+    Condition: DontDeployWithinVPCConstraint
+    Properties:
+      CacheSecurityGroupName: !Ref ECSecurityGroup
+      EC2SecurityGroupName: !Ref EC2SecurityGroupName
+      EC2SecurityGroupOwnerId: !Ref 'AWS::AccountId'
+  ElasticacheSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Condition: DeployWithinVPCConstraint
+    Properties:
+      GroupDescription: !Sub "${AWS::StackName}-${VPCStackName}-Elasticache Security Group"
+      VpcId: 
+        Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, "VPCID"]]
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref ClusterPort
+          ToPort: !Ref ClusterPort
+          SourceSecurityGroupId:  
+            Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Ref ComputeInstanceSecurityGroup]]
+  ECCacheCluster:
+    Type: "AWS::ElastiCache::CacheCluster"
+    Properties:
+      AutoMinorVersionUpgrade: true
+      AZMode: !Ref AZMode
+      CacheNodeType: !Ref CacheNodeType
+      CacheSecurityGroupNames: !If 
+        - DontDeployWithinVPCConstraint
+        - - !Ref ECSecurityGroup
+        - !Ref AWS::NoValue
+      CacheSubnetGroupName: !If 
+        - DeployWithinVPCConstraint
+        - !Ref ECSubnetGroup
+        - !Ref AWS::NoValue
+      ClusterName: !Sub "${AWS::StackName}-${VPCStackName}-ECCacheCluster"
+      Engine: !Ref CacheEngine
+      EngineVersion: !If 
+        - UseDefaultEngineVersionConstraint
+        - !Ref AWS::NoValue
+        - !Ref EngineVersion
+      NotificationTopicArn: !Ref AWS::NoValue
+      NumCacheNodes: !Ref NumCacheNodes
+      Port: !Ref ClusterPort
+      PreferredAvailabilityZone: !Ref AWS::NoValue
+      PreferredAvailabilityZones:
+        - !Ref AWS::NoValue
+      PreferredMaintenanceWindow: !Ref AWS::NoValue
+      SnapshotArns:
+        - !Ref AWS::NoValue
+      SnapshotName: !Ref AWS::NoValue
+      SnapshotRetentionLimit: !Ref AWS::NoValue
+      SnapshotWindow: !Ref AWS::NoValue
+      Tags:
+        - Key: Environment
+          Value: !Ref TagEnvironment
+        - Key: Purpose
+          Value: !Ref TagCachePurpose
+      VpcSecurityGroupIds: !If 
+        - DeployWithinVPCConstraint
+        - - !GetAtt ElasticacheSecurityGroup.GroupId
+        - !Ref AWS::NoValue  
+Outputs:
+ ECCacheClusterID:
+   Description: Cache Cluster resource name
+   Value: !Ref ECCacheCluster
+   Export: 
+     Name: !Sub "${AWS::StackName}-ECCacheClusterID"
+ MemcachedCacheAddress:
+   Description: The DNS hostname of the cache node.
+   Condition: IsMemcachedConstraint
+   Value: !GetAtt ECCacheCluster.ConfigurationEndpoint.Address
+   Export: 
+     Name: !Sub "${AWS::StackName}-MemcachedCacheAddress"
+ MemcachedCachePort:
+   Description: The port number of the configuration endpoint for the Memcached cache cluster.
+   Condition: IsMemcachedConstraint
+   Value: !GetAtt ECCacheCluster.ConfigurationEndpoint.Port
+   Export: 
+     Name: !Sub "${AWS::StackName}-MemcachedCachePort"
+ RedisCacheAddress:
+   Description: The DNS hostname of the cache node.
+   Condition: IsRedisConstraint
+   Value: !GetAtt ECCacheCluster.RedisEndpoint.Address
+   Export: 
+     Name: !Sub "${AWS::StackName}-RedisCacheAddress"
+ RedisCachePort:
+   Description: The port number of the configuration endpoint for the Redis cache cluster.
+   Condition: IsRedisConstraint
+   Value: !GetAtt ECCacheCluster.RedisEndpoint.Port
+   Export: 
+     Name: !Sub "${AWS::StackName}-RedisCachePort"

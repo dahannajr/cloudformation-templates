@@ -1,0 +1,414 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters: 
+  EFSStackName:
+    Description: "Stack used to create the EFS Filesystem"
+    Type: String
+  VPCStackName:
+    Description: Name of the stack where the EFS targets reside
+    Type: String
+  CodeCommitStackName:
+    Description: Name of the stack with created the code commit repository
+    Type: String
+  CodeCommitBranchTrigger:
+    Description: Name of the branch to trigger a Code Pipeline execution
+    Type: String
+    Default: master
+  DomainName: 
+    Description: Domain name for the build to deploy to
+    Type: String
+  ProjectName:
+    Description: Descriptive name of the Code Pipeline
+    Type: String
+Resources:
+  S3ArtifactStore:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${AWS::StackName}-s3artifactstore'
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /service-role/
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - codebuild.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: !Sub '${AWS::StackName}-CodeBuildCloudWatchLogsPolicy'
+          PolicyDocument: 
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - ec2:CreateNetworkInterface
+              - ec2:DescribeDhcpOptions
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DeleteNetworkInterface
+              - ec2:DescribeSubnets
+              - ec2:DescribeSecurityGroups
+              - ec2:DescribeVpcs
+              Resource: "*"
+            - Effect: Allow
+              Action:
+              - ec2:CreateNetworkInterfacePermission
+              Resource: !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:network-interface/*'
+              Condition:
+                StringEquals:
+                  ec2:AuthorizedService: codebuild.amazonaws.com
+        - PolicyName: !Sub '${AWS::StackName}-CodeBuildBasePolicy'
+          PolicyDocument: 
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Resource:
+              - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${ProjectName}-build'
+              - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${ProjectName}-build:*'
+              Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            - Effect: Allow
+              Resource:
+              - !Join
+                - ''
+                - - Fn::GetAtt: [ S3ArtifactStore, Arn ]
+                  - '/*'
+              Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:GetObjectVersion
+              - s3:GetBucketAcl
+              - s3:GetBucketLocation
+            - Effect: Allow
+              Action:
+              - codebuild:CreateReportGroup
+              - codebuild:CreateReport
+              - codebuild:UpdateReport
+              - codebuild:BatchPutTestCases
+              - codebuild:BatchPutCodeCoverages
+              Resource:
+              - !Sub 'arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/${ProjectName}-build-*'
+        - PolicyName: !Sub '${AWS::StackName}-CodeBuildVpcPolicy'
+          PolicyDocument: 
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - ec2:CreateNetworkInterface
+              - ec2:DescribeDhcpOptions
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DeleteNetworkInterface
+              - ec2:DescribeSubnets
+              - ec2:DescribeSecurityGroups
+              - ec2:DescribeVpcs
+              Resource: "*"
+            - Effect: Allow
+              Action:
+              - ec2:CreateNetworkInterfacePermission
+              Resource: !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:network-interface/*'
+              Condition:
+                StringEquals:
+                  ec2:AuthorizedService: codebuild.amazonaws.com
+  CodeBuild:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub '${ProjectName}-build'
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !Sub
+          - |
+            version: 0.2
+            phases:
+              post_build:
+                commands:
+                  - if [ ! -d $CODEBUILD_BUILD_FS_EFS/${DomainName}-tmp ]; then mkdir $CODEBUILD_BUILD_FS_EFS/${DomainName}-tmp; else rm -rf $CODEBUILD_BUILD_FS_EFS/${DomainName}-tmp/*; fi
+                  - cp -r . $CODEBUILD_BUILD_FS_EFS/${DomainName}-tmp
+                  - if [ -d $CODEBUILD_BUILD_FS_EFS/${DomainName} ]; then mv $CODEBUILD_BUILD_FS_EFS/${DomainName} $CODEBUILD_BUILD_FS_EFS/${DomainName}-$(date +"%Y%m%d-%H%M%S"); fi
+                  - mv $CODEBUILD_BUILD_FS_EFS/${DomainName}-tmp $CODEBUILD_BUILD_FS_EFS/${DomainName}
+                  - chown -R ${UID}:${GID} $CODEBUILD_BUILD_FS_EFS/${DomainName}
+          - UID: 
+              Fn::ImportValue: !Join [ "-", [ !Ref EFSStackName, "WebAppUserUID"]]
+            GID: 
+              Fn::ImportValue: !Join [ "-", [ !Ref EFSStackName, "WebAppUserUID"]]
+      Artifacts: 
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_LARGE
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
+        ImagePullCredentialsType: CODEBUILD
+        PrivilegedMode: true
+        Type: LINUX_CONTAINER
+      FileSystemLocations:
+        - Identifier: build_fs_efs
+          Location: !Join
+            - ''
+            - - Fn::ImportValue: 
+                  !Join [ "-", [ !Ref EFSStackName, "ElasticFileSystemDnsName"]]
+              - ':/'
+          MountPoint: /mnt/efs
+          MountOptions: nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2
+          Type: EFS
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Sub '/aws/codebuild/${ProjectName}-build'
+          Status: ENABLED
+          StreamName: !Sub '${ProjectName}-build-stream'
+      QueuedTimeoutInMinutes: 30
+      VpcConfig:
+        SecurityGroupIds:
+         - Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, "DefaultSG"]]
+        Subnets:
+        - Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, "PrivateSubnet1AID"]]
+        - Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, "PrivateSubnet2AID"]]
+        VpcId:
+          Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, "VPCID"]]
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /service-role/
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - codepipeline.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: root
+          PolicyDocument: 
+            Version: 2012-10-17
+            Statement:
+            - Resource: "*"
+              Effect: Allow
+              Action:
+                - iam:PassRole
+              Condition:
+                StringEqualsIfExists:
+                  iam:PassedToService:
+                    - cloudformation.amazonaws.com
+                    - elasticbeanstalk.amazonaws.com
+                    - ec2.amazonaws.com
+                    - ecs-tasks.amazonaws.com
+            - Resource: "*"
+              Effect: Allow
+              Action:
+                - codecommit:CancelUploadArchive
+                - codecommit:GetBranch
+                - codecommit:GetCommit
+                - codecommit:GetUploadArchiveStatus
+                - codecommit:UploadArchive
+            - Resource: "*"
+              Effect: Allow
+              Action:
+                - codedeploy:CreateDeployment
+                - codedeploy:GetApplication
+                - codedeploy:GetApplicationRevision
+                - codedeploy:GetDeployment
+                - codedeploy:GetDeploymentConfig
+                - codedeploy:RegisterApplicationRevision
+            - Resource: "*"
+              Effect: Allow
+              Action:
+                - codestar-connections:UseConnection
+            - Resource: "*"
+              Effect: Allow
+              Action:
+                - elasticbeanstalk:*
+                - ec2:*
+                - elasticloadbalancing:*
+                - autoscaling:*
+                - cloudwatch:*
+                - s3:*
+                - sns:*
+                - cloudformation:*
+                - rds:*
+                - sqs:*
+                - ecs:*
+            - Resource: "*"
+              Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+                - lambda:ListFunctions
+            - Resource: "*"
+              Effect: Allow
+              Action:
+                - opsworks:CreateDeployment
+                - opsworks:DescribeApps
+                - opsworks:DescribeCommands
+                - opsworks:DescribeDeployments
+                - opsworks:DescribeInstances
+                - opsworks:DescribeStacks
+                - opsworks:UpdateApp
+                - opsworks:UpdateStack
+            - Resource: "*"
+              Effect: Allow
+              Action:
+                - cloudformation:CreateStack
+                - cloudformation:DeleteStack
+                - cloudformation:DescribeStacks
+                - cloudformation:UpdateStack
+                - cloudformation:CreateChangeSet
+                - cloudformation:DeleteChangeSet
+                - cloudformation:DescribeChangeSet
+                - cloudformation:ExecuteChangeSet
+                - cloudformation:SetStackPolicy
+                - cloudformation:ValidateTemplate
+            - Resource: "*"
+              Effect: Allow
+              Action:
+                - codebuild:BatchGetBuilds
+                - codebuild:StartBuild
+                - codebuild:BatchGetBuildBatches
+                - codebuild:StartBuildBatch
+            - Resource: "*"
+              Effect: Allow
+              Action:
+                - devicefarm:ListProjects
+                - devicefarm:ListDevicePools
+                - devicefarm:GetRun
+                - devicefarm:GetUpload
+                - devicefarm:CreateUpload
+                - devicefarm:ScheduleRun
+            - Resource: "*"
+              Effect: Allow
+              Action:
+                - servicecatalog:ListProvisioningArtifacts
+                - servicecatalog:CreateProvisioningArtifact
+                - servicecatalog:DescribeProvisioningArtifact
+                - servicecatalog:DeleteProvisioningArtifact
+                - servicecatalog:UpdateProduct
+            - Resource: "*"
+              Effect: Allow
+              Action:
+                - cloudformation:ValidateTemplate
+            - Resource: "*"
+              Effect: Allow
+              Action:
+                - ecr:DescribeImages
+            - Resource: "*"
+              Effect: Allow
+              Action:
+                - states:DescribeExecution
+                - states:DescribeStateMachine
+                - states:StartExecution
+            - Resource: "*"
+              Effect: Allow
+              Action:
+                - appconfig:StartDeployment
+                - appconfig:StopDeployment
+                - appconfig:GetDeployment
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore:
+        Location: !Ref S3ArtifactStore
+        Type: S3
+      Name: !Sub '${ProjectName}-pipeline'
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      Stages:
+        - Actions:
+          - ActionTypeId: 
+              Category: Source
+              Owner: AWS
+              Provider: CodeCommit
+              Version: 1
+            Configuration:
+              RepositoryName: 
+                 Fn::ImportValue: !Join [ "-", [ !Ref CodeCommitStackName, 'RepositoryName'] ]
+              BranchName: !Ref CodeCommitBranchTrigger
+              PollForSourceChanges: 'false'
+              OutputArtifactFormat: CODE_ZIP
+            Name: !Sub '${AWS::StackName}-ActionType-Source-CodeCommit'
+            OutputArtifacts:
+              - Name: SourceArtifact
+            Namespace: SourceVariables
+            RunOrder: 1
+          Name: !Sub '${AWS::StackName}-Stage-CodeSourceRetrieval'
+        - Actions:
+          - ActionTypeId:
+              Category: Build
+              Owner: AWS
+              Provider: CodeBuild
+              Version: 1
+            Configuration: 
+              ProjectName: !Ref CodeBuild
+              PrimarySource: SourceArtifact
+            InputArtifacts:
+              - Name: SourceArtifact
+            OutputArtifacts:
+              - Name: BuildArtifact
+            Namespace: BuildVariables
+            Name: !Sub '${AWS::StackName}-Stage-CodeBuildEFSCopy'
+          Name: !Sub '${AWS::StackName}-Stage-EFS_Copy'
+  CloudWatchEventRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - events.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        -
+          PolicyName: cwe-pipeline-execution
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              -
+                Effect: Allow
+                Action: codepipeline:StartPipelineExecution
+                Resource: !Join [ '', [ 'arn:aws:codepipeline:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':', !Ref CodePipeline ] ]
+  CloudWatchEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      EventPattern:
+        source:
+          - aws.codecommit
+        detail-type:
+          - 'CodeCommit Repository State Change'
+        resources:
+          - !Join
+            - ''
+            - - 'arn:aws:codecommit:'
+              - !Ref 'AWS::Region'
+              - ':'
+              - !Ref 'AWS::AccountId'
+              - ':'
+              - Fn::ImportValue: !Join [ "-", [ !Ref CodeCommitStackName, 'RepositoryName'] ]
+        detail:
+          event:
+            - referenceCreated
+            - referenceUpdated
+          referenceType:
+            - branch
+          referenceName:
+            - !Ref CodeCommitBranchTrigger
+      Targets:
+        -
+          Arn: 
+            !Join [ '', [ 'arn:aws:codepipeline:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':', !Ref CodePipeline ] ]
+          RoleArn: !GetAtt CloudWatchEventRole.Arn
+          Id: !Sub '${ProjectName}-CodePipeline-Execute-Event'
+Outputs:
+  CodePipelineName:
+    Value: !Ref CodePipeline
+    Description: Name of the Code Pipeline
+    Export:
+      Name: !Sub '${AWS::StackName}-CodePipelineName'
+  CodePipelineVersion:
+    Value: !GetAtt ["CodePipeline", "Version"]
+    Description: Version of the Code Pipeline
+    Export:
+      Name: !Sub '${AWS::StackName}-CodePipelineVersion'

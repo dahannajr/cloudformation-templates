@@ -1,0 +1,19 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: CloudFormation template to create a SQS Subscriber to an SNS Topic 
+Parameters: 
+  SNSTopicStackName:
+    Description: Name of the stack used to create the SNS Topic
+    Type: String
+  SQSQueueStackName:
+    Description: Name of the stack that receives SNS Topic Messages
+    Type: String
+Resources: 
+  SNSSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: 
+        Fn::ImportValue: !Join [ '-', [!Ref SNSTopicStackName, 'TopicArn'] ] 
+      Protocol: sqs
+      Endpoint: 
+        Fn::ImportValue: !Join [ '-', [!Ref SQSQueueStackName, 'SourceQueueARN']]
+      RawMessageDelivery: 'true'

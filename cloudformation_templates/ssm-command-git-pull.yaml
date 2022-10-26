@@ -1,0 +1,38 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  Perform a git pull run comand.  The initial intent for this script was to be used part of a build process for a scripting site, such as a PHP app running on EFS
+Parameters:
+  RootDirectory:
+    Description: Root directory where the git pull should be performed. 
+    Type: String
+Resources:
+  SSMCommandDocument:
+    Type: AWS::SSM::Document
+    Properties:
+      Content: 
+        schemaVersion: '2.2'
+        description: Perform a Git pull for a scripted language, e.g. PHP
+        parameters:
+          RootDirectory:
+            type: String
+            description: The root directory where the Git repo is currently checked out
+            default: !Ref RootDirectory
+        mainSteps:
+          - action: aws:runShellScript
+            name: runShellScript
+            inputs:
+              timeoutSeconds: '60'
+              workingDirectory: '{{ RootDirectory }}'
+              runCommand:
+              - "export HOME=/root"
+              - "git config --global credential.helper '!aws codecommit credential-helper $@'"
+              - "git config --global credential.UseHttpPath true"
+              - "git pull"
+      DocumentType: Command
+      Name: 'GitPullCommandDocument'
+Outputs:
+  SSMCommandDocument:
+    Description:  SSMCommandDocument Reference
+    Value: !Ref SSMCommandDocument
+    Export: 
+      Name: !Sub '${AWS::StackName}-SSMCommandDocument'

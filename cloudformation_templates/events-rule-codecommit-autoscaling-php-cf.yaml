@@ -1,0 +1,289 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  This is an event to handle a code commit into a branch that should be deployed to an auto scaling group running a WordPress 
+  setup based on an EFS / OpCache configuration
+Parameters:
+  AutoScalingGroupStackName:
+    Description: Name of the stack which setup the auto scaling group.
+    Type: String
+  CodeCommitStackName:
+    Description: Name of the stack which setup the code commit repo.
+    Type: String
+  CreateFailureNotificaitonTopic:
+    Description: Create a SNS Topic to notify failed exeution of the lambda function
+    Type: String
+    Default: true
+    AllowedValues:
+      - true
+      - false
+  CreateSuccessNotificaitonTopic:
+    Description: Create a SNS Topic to notify successful exeution of the lambda function
+    Type: String
+    Default: true
+    AllowedValues:
+      - true
+      - false
+  FailureSubscriptionEmails:
+    Description: Email addresses of people to receive failure notifications
+    Type: String
+    Default: ''
+  FunctionName:
+    Description: Name to give to the Lambda function
+    Type: String
+  SSMCommandStackName:
+    Description: Name of the stack which created the run command.
+    Type: String
+  SuccessSubscriptionEmails:
+    Description: Email addresses of people to receive failure notifications
+    Type: String
+    Default: ''
+Conditions:
+  CreateFailureNotificaitonTopicCondition: !Equals 
+    - !Ref CreateFailureNotificaitonTopic
+    - true
+  CreateSuccessNotificaitonTopicCondition: !Equals 
+    - !Ref CreateSuccessNotificaitonTopic
+    - true
+  HasFailureSubscriptionEmailsCondition: !Not
+    - !Equals 
+      - !Ref FailureSubscriptionEmails
+      - ''
+  HasSuccessSubscriptionEmailsCondition: !Not
+    - !Equals 
+      - !Ref SuccessSubscriptionEmails
+      - ''
+Resources:
+  EventLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties: 
+      Code:
+        ZipFile: !Sub
+          - |
+            'use strict'
+
+            const AWS = require('aws-sdk')
+            const autoscaling = new AWS.AutoScaling()
+            const ssm = new AWS.SSM()
+
+            exports.handler = (event) => {
+              console.log(JSON.stringify(event, "", 2));
+              fetchInstance(process.env.AUTO_SCALING_GROUP_NAME)
+                .then(instance =>{
+                  runCommand(process.env.SSM_RUN_DOCUMENT, instance)
+                  reportSuccess(JSON.stringify(data), 'Build Success')
+                })
+                .catch(err => {
+                  reportFailure(err.message)
+                })
+            }
+
+            const fetchInstance = (environment) => {
+              return new Promise((resolve, reject) => {
+                autoscaling.describeAutoScalingGroups({
+                  AutoScalingGroupNames: [ environment ]
+                }, (err, data) => {
+                  if (err) {
+                    reject(JSON.stringify(err))
+                  } else {
+                    const instance = selectInstance(data.AutoScalingGroups[0].Instances)
+                    if(instance) {
+                      resolve(instance)
+                    } else {
+                      reject('No instances are available to run commands')
+                    }
+                  }
+                })
+              })
+            }
+
+            const reportFailure = (message, subject) => {
+              const snsTopic = process.env.FAILURE_SNS_TOPIC
+
+              if(snsTopic) {
+                reportToSns(snsTopic, message, subject)
+              } else {
+                console.log('Warning: no failure SNS defined.')
+                console.log('Scheduled Job failed:', message)
+              }
+            }
+
+            const reportSuccess = (message, subject) => {
+              const snsTopic = process.env.SUCCESS_SNS_TOPIC
+
+              if(snsTopic) {
+                reportToSns(snsTopic, message, subject)
+              } else {
+                console.log('Warning: no success SNS defined.')
+                console.log('Scheduled Job failed:', message)
+              }
+            }
+
+            const reportToSns = (topic, message, subject) => {
+              const sns = new AWS.SNS()
+
+              return new Promise((resolve, reject) => {
+                sns.publish({
+                  Message: message,
+                  Subject: subject,
+                  TopicArn: topic
+                }, (err, data) => {
+                  if (err) {
+                    reject(err)
+                  } else {
+                    resolve(data)
+                  }
+                })
+              })
+            }
+
+            const runCommand = (documentName, instance) => {
+              ssm.sendCommand({
+                DocumentName: documentName,
+                InstanceIds: [ instance ],
+                TimeoutSeconds: 3600
+              }, function(err, data) {
+                if (err) {
+                  reportFailure(JSON.stringify(err), 'Scheduled Job Failed')
+                } else {
+                  console.log(data)
+                }
+              })
+            }
+
+            const selectInstance = (instances) => {
+              // Find all healthy and in service instances
+              instances = instances.filter(instance => {
+                return instance.HealthStatus == 'Healthy' && instance.LifecycleState == 'InService' 
+              })
+
+              if(instances.length === 0) return
+
+              // For now just select a random instance
+              return instances[0].InstanceId
+            }
+          - DocumentName: 
+              Fn::ImportValue: !Join [ '-', [ !Ref SSMCommandStackName, 'SSMCommandDocument' ] ]
+            AutoScalingGroupName: 
+              Fn::ImportValue: !Join [ '-', [ !Ref AutoScalingGroupStackName, 'AutoScalingGroup' ] ]
+            FailureNotificaitonTopic: !If 
+              - CreateFailureNotificaitonTopicCondition
+              - !Ref FailureNotificaitonTopic
+              - ''
+            SuccessNotificaitonTopic: !If 
+              - CreateSuccessNotificaitonTopicCondition
+              - !Ref SuccessNotificaitonTopic
+              - ''
+      Description: Lambda function to process Cloud Watch Event Rule
+      Environment:
+        Variables:
+          FAILURE_SNS_TOPIC: !If 
+              - CreateFailureNotificaitonTopicCondition
+              - !Ref FailureNotificaitonTopic
+              - !Ref AWS::NoValue
+          SUCCESS_SNS_TOPIC: !If 
+            - CreateSuccessNotificaitonTopicCondition
+            - !Ref SuccessNotificaitonTopic
+            - !Ref AWS::NoValue
+          AUTO_SCALING_GROUP_NAME: 
+            Fn::ImportValue: !Join [ '-', [ !Ref AutoScalingGroupStackName, 'AutoScalingGroup' ] ]
+          SSM_RUN_DOCUMENT:
+            Fn::ImportValue: !Join [ '-', [ !Ref SSMCommandStackName, 'SSMCommandDocument' ] ]
+      FunctionName: !Join [ '', [ 'event-rule-', !Ref FunctionName ] ]
+      Handler: index.handler
+      Role: !GetAtt EventLambdaRole.Arn
+      Runtime: nodejs12.x
+      Timeout: 60
+  EventLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchFullAccess
+      Policies: 
+        - PolicyName: !Join [ '', [ 'ssm-command-', !Ref AWS::StackName ] ]
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - autoscaling:DescribeAutoScalingGroups
+                  - autoscaling:DescribeScalingActivities
+                  - EC2:DescribeInstances
+                  - ssm:SendCommand
+                  - sns:Publish
+                Resource: '*'
+  EventLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties: 
+      FunctionName: !Ref EventLambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EventBridgeRule.Arn
+  EventBridgeRule:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: CodeCommit Repo Change
+      Name: !Sub "${CodeCommitStackName}-commit-events-rule"
+      EventPattern:
+        detail-type: 
+          - "CodeCommit Repository State Change"
+        source:
+          - "aws.codecommit"
+        resources:
+          - Fn::ImportValue: !Join [ "-", [ !Ref CodeCommitStackName, "RepositoryArn"]]
+        detail:
+          event:
+            - referenceCreated
+            - referenceUpdated
+          referenceType: 
+            - branch
+          referenceName: 
+            - development
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt EventLambdaFunction.Arn
+          Id: !Ref EventLambdaFunction
+  FailureNotificaitonTopic:
+    Type: AWS::SNS::Topic
+    Condition: CreateFailureNotificaitonTopicCondition
+    Properties:
+      DisplayName: !Sub '${AWS::StackName}-FailureNotificaitonTopic'
+      FifoTopic: false
+      TopicName: !Sub '${AWS::StackName}-FailureNotificaitonTopic'
+  SuccessNotificaitonTopic:
+    Type: AWS::SNS::Topic
+    Condition: CreateSuccessNotificaitonTopicCondition
+    Properties:
+      DisplayName: !Sub '${AWS::StackName}-SuccessNotificaitonTopic'
+      FifoTopic: false
+      TopicName: !Sub '${AWS::StackName}-SuccessNotificaitonTopic'
+Outputs:
+  EventLambdaFunction:
+    Description: Lambda function resource name 
+    Value: !Ref EventLambdaFunction
+    Export:
+      Name: !Sub '${AWS::StackName}-EventLambdaFunction'
+  EventLambdaFunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt EventLambdaFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-EventLambdaFunctionArn'
+  EventBridgeRule:
+    Description: Event Bridge Rule resource name 
+    Value: !Ref EventBridgeRule
+    Export:
+      Name: !Sub '${AWS::StackName}-EventBridgeRule'
+  EventBridgeRuleArn:
+    Description: Event Bridge Rule ARN
+    Value: !GetAtt EventBridgeRule.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-EventBridgeRuleArn'

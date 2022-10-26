@@ -1,0 +1,40 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  Setup a Route53 hosted zone.
+Parameters:
+  DomainName:
+    Description: TLD host
+    Type: String
+Resources:
+  Route53Domain:
+    Type: AWS::Route53::HostedZone
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Name: !Ref DomainName
+Outputs:
+  Route53ZoneId:
+    Description: The ID that Route 53 assignedto the hosted zone
+    Value: !GetAtt Route53Domain.Id
+    Export: 
+      Name: !Sub '${AWS::StackName}-Route53ZoneId'
+  NameServer1:
+    Description: The set of name servers for this hosted zone.
+    Value: !Select [ 0, !GetAtt Route53Domain.NameServers ] 
+    Export: 
+      Name: !Sub '${AWS::StackName}-NameServer1'
+  NameServer2:
+    Description: The set of name servers for this hosted zone.
+    Value: !Select [ 1, !GetAtt Route53Domain.NameServers ] 
+    Export: 
+      Name: !Sub '${AWS::StackName}-NameServer2'
+  NameServer3:
+    Description: The set of name servers for this hosted zone.
+    Value: !Select [ 2, !GetAtt Route53Domain.NameServers ] 
+    Export: 
+      Name: !Sub '${AWS::StackName}-NameServer3'
+  NameServer4:
+    Description: The set of name servers for this hosted zone.
+    Value: !Select [ 3, !GetAtt Route53Domain.NameServers ] 
+    Export: 
+      Name: !Sub '${AWS::StackName}-NameServer4'

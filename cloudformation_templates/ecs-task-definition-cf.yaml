@@ -1,0 +1,2008 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: An example CloudFormation template for Fargate.
+Parameters:
+  AutoScalingTargetValue:
+    Type: Number
+    Default: 50
+  CertificateStackName:
+    Type: String
+    Default: ""
+  Container1ContainerCommand:
+    Type: List<String>
+    Default: ""
+  Container1ContainerDependencyLinkNames:
+    Type: CommaDelimitedList
+    Default: ""
+  Container1ContainerDependencyList:
+    Type: List<Number>
+    Description: 1-based index into other conatiners which this container requires
+    Default: 0
+  Container1ContainerDependencyListCount:
+    Type: Number
+    Description: Number of elements in Container1ContainerDependencyList
+    Default: 0
+    MinValue: 0
+    MaxValue: 3
+  Container1ContainerLinkList:
+    Type: List<Number>
+    Description: 1-based index into other conatiners which this container requires
+    Default: 0
+  Container1ContainerLinkListAliases:
+    Type: CommaDelimitedList
+    Default: ""
+  Container1ContainerLinkListCount:
+    Type: Number
+    Description: Number of elements in Container1ContainerDependencyList
+    Default: 0
+    MinValue: 0
+    MaxValue: 3
+  Container1MountPoint1:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container1MountPoint2:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container1MountPoint3:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container2ContainerDependencyLinkNames:
+    Type: CommaDelimitedList
+    Default: ""
+  Container2ContainerDependencyList:
+    Type: List<Number>
+    Description: 1-based index into other conatiners which this container requires
+    Default: 0
+  Container2ContainerDependencyListCount:
+    Type: Number
+    Description: Number of elements in Container1ContainerDependencyList
+    Default: 0
+    MinValue: 0
+    MaxValue: 3
+  Container2MountPoint1:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container2MountPoint2:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container2MountPoint3:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container3ContainerDependencyLinkNames:
+    Type: CommaDelimitedList
+    Default: ""
+  Container3ContainerDependencyList:
+    Type: List<Number>
+    Description: 1-based index into other conatiners which this container requires
+    Default: 0
+  Container3ContainerDependencyListCount:
+    Type: Number
+    Description: Number of elements in Container3ContainerDependencyList
+    Default: 0
+    MinValue: 0
+    MaxValue: 3
+  Container3MountPoint1:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container3MountPoint2:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container3MountPoint3:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container4ContainerDependencyLinkNames:
+    Type: CommaDelimitedList
+    Default: ""
+  Container4ContainerDependencyList:
+    Type: List<Number>
+    Description: 1-based index into other conatiners which this container requires
+    Default: 0
+  Container4ContainerDependencyListCount:
+    Type: Number
+    Description: Number of elements in Container4ContainerDependencyList
+    Default: 0
+    MinValue: 0
+    MaxValue: 3
+  Container4MountPoint1:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container4MountPoint2:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container4MountPoint3:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container5ContainerDependencyLinkNames:
+    Type: CommaDelimitedList
+    Default: ""
+  Container5ContainerDependencyList:
+    Type: List<Number>
+    Description: 1-based index into other conatiners which this container requires
+    Default: 0
+  Container5ContainerDependencyListCount:
+    Type: Number
+    Description: Number of elements in Container5ContainerDependencyList
+    Default: 0
+    MinValue: 0
+    MaxValue: 3
+  Container5MountPoint1:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container5MountPoint2:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container5MountPoint3:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container6ContainerDependencyLinkNames:
+    Type: CommaDelimitedList
+    Default: ""
+  Container6ContainerDependencyList:
+    Type: List<Number>
+    Description: 1-based index into other conatiners which this container requires
+    Default: 0
+  Container6ContainerDependencyListCount:
+    Type: Number
+    Description: Number of elements in Container5ContainerDependencyList
+    Default: 0
+    MinValue: 0
+    MaxValue: 3
+  Container6MountPoint1:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container6MountPoint2:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container6MountPoint3:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container7ContainerDependencyLinkNames:
+    Type: CommaDelimitedList
+    Default: ""
+  Container7ContainerDependencyList:
+    Type: List<Number>
+    Description: 1-based index into other conatiners which this container requires
+    Default: 0
+  Container7ContainerDependencyListCount:
+    Type: Number
+    Description: Number of elements in Container5ContainerDependencyList
+    Default: 0
+    MinValue: 0
+    MaxValue: 3
+  Container7MountPoint1:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container7MountPoint2:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container7MountPoint3:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container8ContainerDependencyLinkNames:
+    Type: CommaDelimitedList
+    Default: ""
+  Container8ContainerDependencyList:
+    Type: List<Number>
+    Description: 1-based index into other conatiners which this container requires
+    Default: 0
+  Container8ContainerDependencyListCount:
+    Type: Number
+    Description: Number of elements in Container5ContainerDependencyList
+    Default: 0
+    MinValue: 0
+    MaxValue: 3
+  Container8MountPoint1:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container8MountPoint2:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container8MountPoint3:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container9ContainerDependencyLinkNames:
+    Type: CommaDelimitedList
+    Default: ""
+  Container9ContainerDependencyList:
+    Type: List<Number>
+    Description: 1-based index into other conatiners which this container requires
+    Default: 0
+  Container9ContainerDependencyListCount:
+    Type: Number
+    Description: Number of elements in Container5ContainerDependencyList
+    Default: 0
+    MinValue: 0
+    MaxValue: 3
+  Container9MountPoint1:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container9MountPoint2:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container9MountPoint3:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container10ContainerDependencyLinkNames:
+    Type: CommaDelimitedList
+    Default: ""
+  Container10ContainerDependencyList:
+    Type: List<Number>
+    Description: 1-based index into other conatiners which this container requires
+    Default: 0
+  Container10ContainerDependencyListCount:
+    Type: Number
+    Description: Number of elements in Container5ContainerDependencyList
+    Default: 0
+    MinValue: 0
+    MaxValue: 3
+  Container10MountPoint1:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container10MountPoint2:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  Container10MountPoint3:
+    Type: String
+    Description: Container Path, Source Volume, Read ReadOnly
+    Default: ""
+  ContainersHaveMemoryReservations:
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+  DesiredCountOfService:
+    Type: Number
+    Default: 1
+  ECRStacks:
+    Description: Comma separated list of stacks containing ECS repositories
+    Type: CommaDelimitedList
+    Default: ""
+  ECRTaskContainerPorts:
+    Type: List<Number>
+  ECRTaskCpu:
+    Description: The number of cpu units used by the task.
+    Type: String
+    Default: ""
+  ECRTaskMemory:
+    Description: The amount (in MiB) of memory used by the task.
+    Type: String
+    Default: ""
+  ECRTaskTags:
+    Description: Comma separated list of tags to associate with the tasks
+    Type: CommaDelimitedList
+    Default: ""
+  ECSClusterStackName:
+    Description: Name of the stack which created the ECS Cluster
+    Type: String
+  EFSStackName:
+    Description: EFS Stack to be used as a volume in the ECS Task Containers
+    Type: String
+    Default: ""
+  EnableDynamicPorts:
+    Description: Enable dynamic ports with Bridge networking mode
+    Type: String
+    Default: true
+    AllowedValues:
+      - true
+      - false
+  EnableFirelens:
+    Description: Enable log streaming through Kinesis Firehose
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+  EnableFluentd:
+    Description: Enable log streaming through Fluentd
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+  EnableLoadBalancerLogging:
+    Description: Enable logging of ALB access logs to S3
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+  EphemeralStorageSizeInGB:
+    Description: Size of the ephemeral stroage to be associated with the Task Definition
+    Type: Number
+    Default: 20
+    MinValue: 20
+    MaxValue: 200
+  HealthCheckPath:
+    Type: String
+    Default: /
+  HostedZoneId:
+    Type: String
+    Default: ""
+  HostedZoneName:
+    Type: String
+    Default: ""
+  LaunchType:
+    Type: String
+    Default: FARGATE
+    AllowedValues:
+      - FARGATE
+      - EC2
+  MaxContainers:
+    Type: Number
+    Default: 10
+  MemoryReservations:
+    Type: List<Number>
+    Description: The soft limit (in MiB) of memory to reserve for the containers.
+    Default: 0
+  MinContainers:
+    Type: Number
+    Default: 2
+  NetworkMode:
+    Type: String
+    Description: The Docker networking mode to use for the containers in the task.
+    Default: awsvpc
+    AllowedValues:
+      - awsvpc
+      - bridge
+      - host
+      - none
+  NumberOfContainers:
+    Type: Number
+    MinValue: 0
+    MaxValue: 10
+  PublicHTTPPort:
+    Type: Number
+    Default: 0
+  PublicHTTPSPort:
+    Type: Number
+    Default: 0
+  Route53StackName:
+    Type: String
+  SecretStacks:
+    Description: Comma separated list of stacks containing ECS repositories
+    Type: CommaDelimitedList
+    Default: ""
+  ServiceRegistryEntriesCount:
+    Type: Number
+    Description: Number of Service Registry Entries to create in CloudMap
+    Default: 0
+  ServiceRegistryEntryForContainers:
+    Type: List<Number>
+    Description: 0-based index into Container listing for creating a Cloud Map Service Entry
+    Default: 0
+  ServiceName:
+    Type: String
+  ServiceRegistryStackName:
+    Type: String
+    Description: Name of the CloudMap Private DNS Service Registry Stack
+    Default: ""
+  SecurityGroupStackName:
+    Type: String
+    Default: ""
+  SecurityGroupStackExportVariableName:
+    Type: String
+    Default: SecurityGroupId
+  Subdomain:
+    Type: String
+    Default: ""
+  TargetContainer:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    MaxValue: 10
+  VolumesBindCount:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    MaxValue: 5
+  VolumesBindNames:
+    Description: Comma separated list of Task Volume Nams for Bind
+    Type: CommaDelimitedList
+    Default: ""
+  VPCStackName:
+    Description: Name of the stack used to create the VPC
+    Type: String
+Conditions:
+  Container1ContainerHasCommand: !Not
+    - !Equals
+      - !Join ["", !Ref Container1ContainerCommand]
+      - ""
+  Container1Has1OrMoreContainerDependencies: !Not
+    - !Equals
+      - !Ref Container1ContainerDependencyListCount
+      - 0
+  Container1Has2OrMoreContainerDependencies: !And
+    - !Condition Container1Has1OrMoreContainerDependencies
+    - !Not
+      - !Equals
+        - !Ref Container1ContainerDependencyListCount
+        - 1
+  Container1Has3OrMoreContainerDependencies: !And
+    - !Condition Container1Has2OrMoreContainerDependencies
+    - !Not
+      - !Equals
+        - !Ref Container1ContainerDependencyListCount
+        - 2
+  Container1HasMountPoint1: !Not
+    - !Equals
+      - !Ref Container1MountPoint1
+      - ""
+  Container1HasMountPoint2: !Not
+    - !Equals
+      - !Ref Container1MountPoint2
+      - ""
+  Container1HasMountPoint3: !Not
+    - !Equals
+      - !Ref Container1MountPoint3
+      - ""
+  Container2Has1OrMoreContainerDependencies: !Not
+    - !Equals
+      - !Ref Container2ContainerDependencyListCount
+      - 0
+  Container2Has2OrMoreContainerDependencies: !Not
+    - !Or
+      - !Equals
+        - !Ref Container2ContainerDependencyListCount
+        - 0
+      - !Equals
+        - !Ref Container2ContainerDependencyListCount
+        - 1
+  Container2Has3OrMoreContainerDependencies: !Equals
+    - !Ref Container2ContainerDependencyListCount
+    - 3
+  Container2HasMountPoint1: !Not
+    - !Equals
+      - !Ref Container2MountPoint1
+      - ""
+  Container2HasMountPoint2: !Not
+    - !Equals
+      - !Ref Container2MountPoint2
+      - ""
+  Container2HasMountPoint3: !Not
+    - !Equals
+      - !Ref Container2MountPoint3
+      - ""
+  Container3Has1OrMoreContainerDependencies: !Not
+    - !Equals
+      - !Ref Container3ContainerDependencyListCount
+      - 0
+  Container3Has2OrMoreContainerDependencies: !Not
+    - !Or
+      - !Equals
+        - !Ref Container3ContainerDependencyListCount
+        - 0
+      - !Equals
+        - !Ref Container3ContainerDependencyListCount
+        - 1
+  Container3Has3OrMoreContainerDependencies: !Equals
+    - !Ref Container3ContainerDependencyListCount
+    - 3
+  Container3HasMountPoint1: !Not
+    - !Equals
+      - !Ref Container3MountPoint1
+      - ""
+  Container3HasMountPoint2: !Not
+    - !Equals
+      - !Ref Container3MountPoint2
+      - ""
+  Container3HasMountPoint3: !Not
+    - !Equals
+      - !Ref Container3MountPoint3
+      - ""
+  Container4Has1OrMoreContainerDependencies: !Not
+    - !Equals
+      - !Ref Container4ContainerDependencyListCount
+      - 0
+  Container4Has2OrMoreContainerDependencies: !Not
+    - !Or
+      - !Equals
+        - !Ref Container4ContainerDependencyListCount
+        - 0
+      - !Equals
+        - !Ref Container4ContainerDependencyListCount
+        - 1
+  Container4Has3OrMoreContainerDependencies: !Equals
+    - !Ref Container4ContainerDependencyListCount
+    - 3
+  Container4HasMountPoint1: !Not
+    - !Equals
+      - !Ref Container4MountPoint1
+      - ""
+  Container4HasMountPoint2: !Not
+    - !Equals
+      - !Ref Container4MountPoint2
+      - ""
+  Container4HasMountPoint3: !Not
+    - !Equals
+      - !Ref Container4MountPoint3
+      - ""
+  Container5Has1OrMoreContainerDependencies: !Not
+    - !Equals
+      - !Ref Container5ContainerDependencyListCount
+      - 0
+  Container5Has2OrMoreContainerDependencies: !Not
+    - !Or
+      - !Equals
+        - !Ref Container5ContainerDependencyListCount
+        - 0
+      - !Equals
+        - !Ref Container5ContainerDependencyListCount
+        - 1
+  Container5Has3OrMoreContainerDependencies: !Equals
+    - !Ref Container5ContainerDependencyListCount
+    - 3
+  Container5HasMountPoint1: !Not
+    - !Equals
+      - !Ref Container5MountPoint1
+      - ""
+  Container5HasMountPoint2: !Not
+    - !Equals
+      - !Ref Container5MountPoint2
+      - ""
+  Container5HasMountPoint3: !Not
+    - !Equals
+      - !Ref Container5MountPoint3
+      - ""
+  Container6Has1OrMoreContainerDependencies: !Not
+    - !Equals
+      - !Ref Container6ContainerDependencyListCount
+      - 0
+  Container6Has2OrMoreContainerDependencies: !Not
+    - !Or
+      - !Equals
+        - !Ref Container6ContainerDependencyListCount
+        - 0
+      - !Equals
+        - !Ref Container6ContainerDependencyListCount
+        - 1
+  Container6Has3OrMoreContainerDependencies: !Equals
+    - !Ref Container6ContainerDependencyListCount
+    - 3
+  Container6HasMountPoint1: !Not
+    - !Equals
+      - !Ref Container6MountPoint1
+      - ""
+  Container6HasMountPoint2: !Not
+    - !Equals
+      - !Ref Container6MountPoint2
+      - ""
+  Container6HasMountPoint3: !Not
+    - !Equals
+      - !Ref Container6MountPoint3
+      - ""
+  Container7Has1OrMoreContainerDependencies: !Not
+    - !Equals
+      - !Ref Container7ContainerDependencyListCount
+      - 0
+  Container7Has2OrMoreContainerDependencies: !Not
+    - !Or
+      - !Equals
+        - !Ref Container7ContainerDependencyListCount
+        - 0
+      - !Equals
+        - !Ref Container7ContainerDependencyListCount
+        - 1
+  Container7Has3OrMoreContainerDependencies: !Equals
+    - !Ref Container7ContainerDependencyListCount
+    - 3
+  Container7HasMountPoint1: !Not
+    - !Equals
+      - !Ref Container7MountPoint1
+      - ""
+  Container7HasMountPoint2: !Not
+    - !Equals
+      - !Ref Container7MountPoint2
+      - ""
+  Container7HasMountPoint3: !Not
+    - !Equals
+      - !Ref Container7MountPoint3
+      - ""
+  Container8Has1OrMoreContainerDependencies: !Not
+    - !Equals
+      - !Ref Container8ContainerDependencyListCount
+      - 0
+  Container8Has2OrMoreContainerDependencies: !Not
+    - !Or
+      - !Equals
+        - !Ref Container8ContainerDependencyListCount
+        - 0
+      - !Equals
+        - !Ref Container8ContainerDependencyListCount
+        - 1
+  Container8Has3OrMoreContainerDependencies: !Equals
+    - !Ref Container8ContainerDependencyListCount
+    - 3
+  Container8HasMountPoint1: !Not
+    - !Equals
+      - !Ref Container8MountPoint1
+      - ""
+  Container8HasMountPoint2: !Not
+    - !Equals
+      - !Ref Container8MountPoint2
+      - ""
+  Container8HasMountPoint3: !Not
+    - !Equals
+      - !Ref Container8MountPoint3
+      - ""
+  Container9Has1OrMoreContainerDependencies: !Not
+    - !Equals
+      - !Ref Container9ContainerDependencyListCount
+      - 0
+  Container9Has2OrMoreContainerDependencies: !Not
+    - !Or
+      - !Equals
+        - !Ref Container9ContainerDependencyListCount
+        - 0
+      - !Equals
+        - !Ref Container9ContainerDependencyListCount
+        - 1
+  Container9Has3OrMoreContainerDependencies: !Equals
+    - !Ref Container9ContainerDependencyListCount
+    - 3
+  Container9HasMountPoint1: !Not
+    - !Equals
+      - !Ref Container9MountPoint1
+      - ""
+  Container9HasMountPoint2: !Not
+    - !Equals
+      - !Ref Container9MountPoint2
+      - ""
+  Container9HasMountPoint3: !Not
+    - !Equals
+      - !Ref Container9MountPoint3
+      - ""
+  Container10Has1OrMoreContainerDependencies: !Not
+    - !Equals
+      - !Ref Container10ContainerDependencyListCount
+      - 0
+  Container10Has2OrMoreContainerDependencies: !Not
+    - !Or
+      - !Equals
+        - !Ref Container10ContainerDependencyListCount
+        - 0
+      - !Equals
+        - !Ref Container10ContainerDependencyListCount
+        - 1
+  Container10Has3OrMoreContainerDependencies: !Equals
+    - !Ref Container10ContainerDependencyListCount
+    - 3
+  Container10HasMountPoint1: !Not
+    - !Equals
+      - !Ref Container10MountPoint1
+      - ""
+  Container10HasMountPoint2: !Not
+    - !Equals
+      - !Ref Container10MountPoint2
+      - ""
+  Container10HasMountPoint3: !Not
+    - !Equals
+      - !Ref Container10MountPoint3
+      - ""
+  ContainersHaveMemoryReservationsCondition: !Equals
+    - !Ref ContainersHaveMemoryReservations
+    - true
+  Container1HasExposedPorts: !And
+    - !Condition HasAtLeast1TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Select [0, !Ref ECRTaskContainerPorts]
+        - 0
+  Container2HasExposedPorts: !And
+    - !Condition HasAtLeast2TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Select [1, !Ref ECRTaskContainerPorts]
+        - 0
+  Container3HasExposedPorts: !And
+    - !Condition HasAtLeast3TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Select [2, !Ref ECRTaskContainerPorts]
+        - 0
+  Container4HasExposedPorts: !And
+    - !Condition HasAtLeast4TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Select [3, !Ref ECRTaskContainerPorts]
+        - 0
+  Container5HasExposedPorts: !And
+    - !Condition HasAtLeast5TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Select [4, !Ref ECRTaskContainerPorts]
+        - 0
+  Container6HasExposedPorts: !And
+    - !Condition HasAtLeast6TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Select [5, !Ref ECRTaskContainerPorts]
+        - 0
+  Container7HasExposedPorts: !And
+    - !Condition HasAtLeast7TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Select [6, !Ref ECRTaskContainerPorts]
+        - 0
+  Container8HasExposedPorts: !And
+    - !Condition HasAtLeast8TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Select [7, !Ref ECRTaskContainerPorts]
+        - 0
+  Container9HasExposedPorts: !And
+    - !Condition HasAtLeast9TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Select [8, !Ref ECRTaskContainerPorts]
+        - 0
+  Container10HasExposedPorts: !And
+    - !Condition HasAtLeast10TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Select [9, !Ref ECRTaskContainerPorts]
+        - 0
+  CreateLoadBalancerCondition: !Or
+    - !Not
+      - !Equals
+        - !Ref PublicHTTPPort
+        - 0
+    - !Not
+      - !Equals
+        - !Ref PublicHTTPSPort
+        - 0
+  CreateEphemeralStorageCondition: !Not
+    - !Equals
+      - 20
+      - !Ref EphemeralStorageSizeInGB
+  CreatePublicHTTPListener: !Not
+    - !Equals
+      - !Ref PublicHTTPPort
+      - 0
+  CreatePublicHTTPSListener: !Not
+    - !Equals
+      - !Ref PublicHTTPSPort
+      - 0
+  CreateRoute53RecordSet: !Or
+    - !Not
+      - !Equals
+        - !Ref HostedZoneId
+        - ""
+    - !Not
+      - !Equals
+        - !Ref HostedZoneName
+        - ""
+  CreateServiceRegistryEntryFor1OrMoreContainersCondition: !And
+    - !Not
+      - !Equals
+        - !Ref ServiceRegistryStackName
+        - ""
+    - !Not
+      - !Equals
+        - !Ref ServiceRegistryEntriesCount
+        - 0
+  CreateServiceRegistryEntryFor2OrMoreContainersCondition: !And
+    - !Condition CreateServiceRegistryEntryFor1OrMoreContainersCondition
+    - !Not
+      - !Equals
+        - !Ref ServiceRegistryEntriesCount
+        - 1
+  CreateServiceRegistryEntryFor3OrMoreContainersCondition: !And
+    - !Condition CreateServiceRegistryEntryFor2OrMoreContainersCondition
+    - !Not
+      - !Equals
+        - !Ref ServiceRegistryEntriesCount
+        - 2
+  CreateServiceRegistryEntryFor4OrMoreContainersCondition: !And
+    - !Condition CreateServiceRegistryEntryFor3OrMoreContainersCondition
+    - !Not
+      - !Equals
+        - !Ref ServiceRegistryEntriesCount
+        - 3
+  CreateServiceRegistryEntryFor5OrMoreContainersCondition: !And
+    - !Condition CreateServiceRegistryEntryFor4OrMoreContainersCondition
+    - !Not
+      - !Equals
+        - !Ref ServiceRegistryEntriesCount
+        - 4
+  CreateServiceRegistryEntryFor6OrMoreContainersCondition: !And
+    - !Condition CreateServiceRegistryEntryFor5OrMoreContainersCondition
+    - !Not
+      - !Equals
+        - !Ref ServiceRegistryEntriesCount
+        - 5
+  CreateServiceRegistryEntryFor7OrMoreContainersCondition: !And
+    - !Condition CreateServiceRegistryEntryFor6OrMoreContainersCondition
+    - !Not
+      - !Equals
+        - !Ref ServiceRegistryEntriesCount
+        - 6
+  CreateServiceRegistryEntryFor8OrMoreContainersCondition: !And
+    - !Condition CreateServiceRegistryEntryFor7OrMoreContainersCondition
+    - !Not
+      - !Equals
+        - !Ref ServiceRegistryEntriesCount
+        - 7
+  CreateServiceRegistryEntryFor9OrMoreContainersCondition: !And
+    - !Condition CreateServiceRegistryEntryFor8OrMoreContainersCondition
+    - !Not
+      - !Equals
+        - !Ref ServiceRegistryEntriesCount
+        - 8
+  CreateServiceRegistryEntryFor10OrMoreContainersCondition: !And
+    - !Condition CreateServiceRegistryEntryFor9OrMoreContainersCondition
+    - !Not
+      - !Equals
+        - !Ref ServiceRegistryEntriesCount
+        - 9
+  EnableDynamicPortsCondition: !Equals
+    - !Ref EnableDynamicPorts
+    - true
+  EnableFirelensCondition: !Equals
+    - !Ref EnableFirelens
+    - true
+  EnableFluentdCondition: !Equals
+    - !Ref EnableFluentd
+    - true
+  EnableLoadBalancerLoggingCondition: !Equals
+    - !Ref EnableLoadBalancerLogging
+    - true
+  HasCertificateCondition: !Not
+    - !Equals
+      - !Ref CertificateStackName
+      - ""
+  HasClusterStackCondition: !Not
+    - !Equals
+      - !Ref ECSClusterStackName
+      - ""
+  HasHealthCheckCondition: !Not
+    - !Equals
+      - !Ref HealthCheckPath
+      - ""
+  HasHostedZoneId: !Not
+    - !Equals
+      - !Ref HostedZoneId
+      - ""
+  HasHostedZoneName: !Not
+    - !Equals
+      - !Ref HostedZoneName
+      - ""
+  HasAtLeast1TargetContainersCondition: !Or
+    - !Equals
+      - !Ref NumberOfContainers
+      - 1
+    - !Equals
+      - !Ref NumberOfContainers
+      - 2
+    - !Equals
+      - !Ref NumberOfContainers
+      - 3
+    - !Equals
+      - !Ref NumberOfContainers
+      - 4
+    - !Equals
+      - !Ref NumberOfContainers
+      - 5
+    - !Equals
+      - !Ref NumberOfContainers
+      - 6
+    - !Equals
+      - !Ref NumberOfContainers
+      - 7
+    - !Equals
+      - !Ref NumberOfContainers
+      - 8
+    - !Equals
+      - !Ref NumberOfContainers
+      - 9
+    - !Equals
+      - !Ref NumberOfContainers
+      - 10
+  HasAtLeast2TargetContainersCondition: !And
+    - !Condition HasAtLeast1TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Ref NumberOfContainers
+        - 1
+  HasAtLeast3TargetContainersCondition: !And
+    - !Condition HasAtLeast2TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Ref NumberOfContainers
+        - 2
+  HasAtLeast4TargetContainersCondition: !And
+    - !Condition HasAtLeast3TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Ref NumberOfContainers
+        - 3
+  HasAtLeast5TargetContainersCondition: !And
+    - !Condition HasAtLeast4TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Ref NumberOfContainers
+        - 4
+  HasAtLeast6TargetContainersCondition: !And
+    - !Condition HasAtLeast5TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Ref NumberOfContainers
+        - 5
+  HasAtLeast7TargetContainersCondition: !And
+    - !Condition HasAtLeast6TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Ref NumberOfContainers
+        - 6
+  HasAtLeast8TargetContainersCondition: !And
+    - !Condition HasAtLeast7TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Ref NumberOfContainers
+        - 7
+  HasAtLeast9TargetContainersCondition: !And
+    - !Condition HasAtLeast8TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Ref NumberOfContainers
+        - 8
+  HasAtLeast10TargetContainersCondition: !And
+    - !Condition HasAtLeast9TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Ref NumberOfContainers
+        - 9
+  HasAtLeast1VolumeBind: !Or
+    - !Equals
+      - !Ref VolumesBindCount
+      - 1
+    - !Equals
+      - !Ref VolumesBindCount
+      - 2
+    - !Equals
+      - !Ref VolumesBindCount
+      - 3
+    - !Equals
+      - !Ref VolumesBindCount
+      - 4
+    - !Equals
+      - !Ref VolumesBindCount
+      - 5
+  HasAtLeast2VolumeBind: !And
+    - !Condition HasAtLeast1VolumeBind
+    - !Not
+      - !Equals
+        - !Ref VolumesBindCount
+        - 1
+  HasAtLeast3VolumeBind: !And
+    - !Condition HasAtLeast2VolumeBind
+    - !Not
+      - !Equals
+        - !Ref VolumesBindCount
+        - 2
+  HasAtLeast4VolumeBind: !And
+    - !Condition HasAtLeast3VolumeBind
+    - !Not
+      - !Equals
+        - !Ref VolumesBindCount
+        - 3
+  HasAtLeast5VolumeBind: !And
+    - !Condition HasAtLeast4VolumeBind
+    - !Not
+      - !Equals
+        - !Ref VolumesBindCount
+        - 4
+  IsFargateLaunchType: !Equals
+    - !Ref LaunchType
+    - FARGATE
+  IsEC2LaunchType: !Equals
+    - !Ref LaunchType
+    - EC2
+  IsNetworkModeAwsvpc: !Equals
+    - !Ref NetworkMode
+    - awsvpc
+  IsNetworkModeBridgeOrHost: !Or
+    - !Equals
+      - !Ref NetworkMode
+      - bridge
+    - !Equals
+      - !Ref NetworkMode
+      - host
+  IsTaskCPUSet: !Not
+    - !Equals
+      - !Ref ECRTaskCpu
+      - ""
+  IsTaskMemorySet: !Not
+    - !Equals
+      - !Ref ECRTaskMemory
+      - ""
+  Target1UsesSecretStack: !And
+    - !Condition HasAtLeast1TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Select [0, !Ref SecretStacks]
+        - "none"
+  Target2UsesSecretStack: !And
+    - !Condition HasAtLeast2TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Select [1, !Ref SecretStacks]
+        - "none"
+  Target3UsesSecretStack: !And
+    - !Condition HasAtLeast3TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Select [2, !Ref SecretStacks]
+        - "none"
+  Target4UsesSecretStack: !And
+    - !Condition HasAtLeast4TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Select [3, !Ref SecretStacks]
+        - "none"
+  Target5UsesSecretStack: !And
+    - !Condition HasAtLeast5TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Select [4, !Ref SecretStacks]
+        - "none"
+  Target6UsesSecretStack: !And
+    - !Condition HasAtLeast6TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Select [5, !Ref SecretStacks]
+        - "none"
+  Target7UsesSecretStack: !And
+    - !Condition HasAtLeast7TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Select [6, !Ref SecretStacks]
+        - "none"
+  Target8UsesSecretStack: !And
+    - !Condition HasAtLeast8TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Select [7, !Ref SecretStacks]
+        - "none"
+  Target9UsesSecretStack: !And
+    - !Condition HasAtLeast9TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Select [8, !Ref SecretStacks]
+        - "none"
+  Target10UsesSecretStack: !And
+    - !Condition HasAtLeast10TargetContainersCondition
+    - !Not
+      - !Equals
+        - !Select [9, !Ref SecretStacks]
+        - "none"
+  UseIPTargetType: !Equals
+    - !Ref NetworkMode
+    - "awsvpc"
+Mappings:
+  RegionARNPrefix:
+    us-east-1:
+      ARNPrefix: "arn:aws:"
+    us-west-1:
+      ARNPrefix: "arn:aws:"
+    us-west-2:
+      ARNPrefix: "arn:aws:"
+    eu-west-1:
+      ARNPrefix: "arn:aws:"
+    ap-northeast-1:
+      ARNPrefix: "arn:aws:"
+    ap-northeast-2:
+      ARNPrefix: "arn:aws:"
+    ap-southeast-1:
+      ARNPrefix: "arn:aws:"
+    ap-southeast-2:
+      ARNPrefix: "arn:aws:"
+    ap-south-1:
+      ARNPrefix: "arn:aws:"
+    us-east-2:
+      ARNPrefix: "arn:aws:"
+    sa-east-1:
+      ARNPrefix: "arn:aws:"
+    cn-north-1:
+      ARNPrefix: "arn:aws-cn:"
+    eu-central-1:
+      ARNPrefix: "arn:aws:"
+  RegionELBAccountId:
+    us-east-1:
+      AccountId: "127311923021"
+    us-west-1:
+      AccountId: "027434742980"
+    us-west-2:
+      AccountId: "797873946194"
+    eu-west-1:
+      AccountId: "156460612806"
+    ap-northeast-1:
+      AccountId: "582318560864"
+    ap-northeast-2:
+      AccountId: "600734575887"
+    ap-southeast-1:
+      AccountId: "114774131450"
+    ap-southeast-2:
+      AccountId: "783225319266"
+    ap-south-1:
+      AccountId: "718504428378"
+    us-east-2:
+      AccountId: "033677994240"
+    sa-east-1:
+      AccountId: "507241528517"
+    cn-north-1:
+      AccountId: "638102146993"
+    eu-central-1:
+      AccountId: "054676820928"
+Resources:
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Condition: HasAtLeast1TargetContainersCondition
+    Properties:
+      # Name of the task definition. Subsequent versions of the task definition are grouped together under this name.
+      Family: !Join ["-", [!Ref ServiceName, TaskDefinition]]
+      # awsvpc is required for Fargate
+      NetworkMode: !Ref NetworkMode
+      # 256 (.25 vCPU) - Available memory values: 0.5GB, 1GB, 2GB
+      # 512 (.5 vCPU) - Available memory values: 1GB, 2GB, 3GB, 4GB
+      # 1024 (1 vCPU) - Available memory values: 2GB, 3GB, 4GB, 5GB, 6GB, 7GB, 8GB
+      # 2048 (2 vCPU) - Available memory values: Between 4GB and 16GB in 1GB increments
+      # 4096 (4 vCPU) - Available memory values: Between 8GB and 30GB in 1GB increments
+      Cpu: !If
+        - IsTaskCPUSet
+        - !Ref ECRTaskCpu
+        - !Ref AWS::NoValue
+      # 0.5GB, 1GB, 2GB - Available cpu values: 256 (.25 vCPU)
+      # 1GB, 2GB, 3GB, 4GB - Available cpu values: 512 (.5 vCPU)
+      # 2GB, 3GB, 4GB, 5GB, 6GB, 7GB, 8GB - Available cpu values: 1024 (1 vCPU)
+      # Between 4GB and 16GB in 1GB increments - Available cpu values: 2048 (2 vCPU)
+      # Between 8GB and 30GB in 1GB increments - Available cpu values: 4096 (4 vCPU)
+      Memory: !If
+        - IsTaskMemorySet
+        - !Ref ECRTaskMemory
+        - !Ref AWS::NoValue
+      EphemeralStorage: !If
+        - CreateEphemeralStorageCondition
+        - SizeInGiB: !Ref EphemeralStorageSizeInGB
+        - !Ref AWS::NoValue
+      # A role needed by ECS.
+      # "The ARN of the task execution role that containers in this task can assume. All containers in this task are granted the permissions that are specified in this role."
+      # "There is an optional task execution IAM role that you can specify with Fargate to allow your Fargate tasks to make API calls to Amazon ECR."
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      # "The Amazon Resource Name (ARN) of an AWS Identity and Access Management (IAM) role that grants containers in the task permission to call AWS APIs on your behalf."
+      TaskRoleArn: !Ref TaskRole
+      Volumes:
+        - !If
+          - HasAtLeast1VolumeBind
+          - Name: !Select [0, !Ref VolumesBindNames]
+            Host: !Ref AWS::NoValue
+          - !Ref AWS::NoValue
+        - !If
+          - HasAtLeast2VolumeBind
+          - Name: !Select [1, !Ref VolumesBindNames]
+            Host: !Ref AWS::NoValue
+          - !Ref AWS::NoValue
+        - !If
+          - HasAtLeast3VolumeBind
+          - Name: !Select [2, !Ref VolumesBindNames]
+            Host: !Ref AWS::NoValue
+          - !Ref AWS::NoValue
+        - !If
+          - HasAtLeast4VolumeBind
+          - Name: !Select [3, !Ref VolumesBindNames]
+            Host: !Ref AWS::NoValue
+          - !Ref AWS::NoValue
+        - !If
+          - HasAtLeast5VolumeBind
+          - Name: !Select [4, !Ref VolumesBindNames]
+            Host: !Ref AWS::NoValue
+          - !Ref AWS::NoValue
+        # - Name: wp-content-uploads
+        #   EFSVolumeConfiguration:
+        #     FilesystemId:
+        #       Fn::ImportValue: !Join [ "-", [ !Ref EFSStackName, "EFSFileSystem"]]
+        #     AuthorizationConfig:
+        #       AccessPointId:
+        #         Fn::ImportValue: !Join [ "-", [ !Ref EFSStackName, "AccessPointResourceId"]]
+        #       IAM: DISABLED
+        #     RootDirectory: /
+        #     TransitEncryption: ENABLED
+      ContainerDefinitions:
+        - !If
+          - HasAtLeast2TargetContainersCondition
+          - Name:
+              Fn::ImportValue:
+                !Join ["-", [!Select [1, !Ref ECRStacks], "ECRName"]]
+            Image: !Join
+              - ""
+              - - !Ref AWS::AccountId
+                - ".dkr.ecr."
+                - !Ref AWS::Region
+                - ".amazonaws.com/"
+                - Fn::ImportValue:
+                    !Join ["-", [!Select [1, !Ref ECRStacks], "ECRName"]]
+                - ":"
+                - !Select [1, !Ref ECRTaskTags]
+            PortMappings: !If
+              - Container2HasExposedPorts
+              - - ContainerPort: !Select [1, !Ref ECRTaskContainerPorts]
+                  HostPort: !If
+                    - EnableDynamicPortsCondition
+                    - !Ref AWS::NoValue
+                    - !Select [1, !Ref ECRTaskContainerPorts]
+              - !Ref AWS::NoValue
+            Links:
+              - !If
+                - Container2Has1OrMoreContainerDependencies
+                - !Join
+                  - ":"
+                  - - Fn::ImportValue: !Join
+                        - "-"
+                        - - !Select
+                            - !Select [
+                                0,
+                                !Ref Container2ContainerDependencyList,
+                              ]
+                            - !Ref ECRStacks
+                          - "ECRName"
+                    - !Select [0, !Ref Container2ContainerDependencyLinkNames]
+                - !Ref AWS::NoValue
+            # Send logs to CloudWatch Logs
+            MemoryReservation: !If
+              - ContainersHaveMemoryReservationsCondition
+              - !Select [1, !Ref MemoryReservations]
+              - !Ref AWS::NoValue
+            Secrets:
+              - !If
+                - Target2UsesSecretStack
+                - Name: ENV_FROM_JSON
+                  ValueFrom:
+                    Fn::ImportValue:
+                      !Join ["-", [!Select [1, !Ref SecretStacks], "SecretArn"]]
+                - !Ref AWS::NoValue
+            LogConfiguration: 
+              LogDriver: awslogs
+              Options:
+                awslogs-region: !Ref AWS::Region
+                awslogs-group: !Ref LogGroup
+                awslogs-stream-prefix: ecs
+                mode: non-blocking
+            MountPoints:
+              - !If
+                - Container2HasMountPoint1
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container2MountPoint1]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container2MountPoint1]]
+                  ReadOnly:
+                    !Select [2, !Split [",", !Ref Container2MountPoint1]]
+                - !Ref AWS::NoValue
+              - !If
+                - Container2HasMountPoint2
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container2MountPoint2]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container2MountPoint2]]
+                  ReadOnly:
+                    !Select [2, !Split [",", !Ref Container2MountPoint2]]
+                - !Ref AWS::NoValue
+              - !If
+                - Container2HasMountPoint3
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container2MountPoint3]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container2MountPoint3]]
+                  ReadOnly:
+                    !Select [2, !Split [",", !Ref Container2MountPoint3]]
+                - !Ref AWS::NoValue
+          - !Ref AWS::NoValue
+        - !If
+          - HasAtLeast3TargetContainersCondition
+          - Name:
+              Fn::ImportValue:
+                !Join ["-", [!Select [2, !Ref ECRStacks], "ECRName"]]
+            Image: !Join
+              - ""
+              - - !Ref AWS::AccountId
+                - ".dkr.ecr."
+                - !Ref AWS::Region
+                - ".amazonaws.com/"
+                - Fn::ImportValue:
+                    !Join ["-", [!Select [2, !Ref ECRStacks], "ECRName"]]
+                - ":"
+                - !Select [2, !Ref ECRTaskTags]
+            PortMappings: !If
+              - Container3HasExposedPorts
+              - - ContainerPort: !Select [2, !Ref ECRTaskContainerPorts]
+                  HostPort: !If
+                    - EnableDynamicPortsCondition
+                    - !Ref AWS::NoValue
+                    - !Select [2, !Ref ECRTaskContainerPorts]
+              - !Ref AWS::NoValue
+            Links:
+              - !If
+                - Container3Has1OrMoreContainerDependencies
+                - !Join
+                  - ":"
+                  - - Fn::ImportValue: !Join
+                        - "-"
+                        - - !Select
+                            - !Select [
+                                0,
+                                !Ref Container3ContainerDependencyList,
+                              ]
+                            - !Ref ECRStacks
+                          - "ECRName"
+                    - !Select [0, !Ref Container3ContainerDependencyLinkNames]
+                - !Ref AWS::NoValue
+            DependsOn:
+              - !If
+                - Container3Has1OrMoreContainerDependencies
+                - Condition: START
+                  ContainerName:
+                    Fn::ImportValue: !Join
+                      - "-"
+                      - - !Select
+                          - !Select [0, !Ref Container3ContainerDependencyList]
+                          - !Ref ECRStacks
+                        - "ECRName"
+                - !Ref AWS::NoValue
+            MemoryReservation: !If
+              - ContainersHaveMemoryReservationsCondition
+              - !Select [2, !Ref MemoryReservations]
+              - !Ref AWS::NoValue
+            # Send logs to CloudWatch Logs
+            Secrets:
+              - !If
+                - Target3UsesSecretStack
+                - Name: ENV_FROM_JSON
+                  ValueFrom:
+                    Fn::ImportValue:
+                      !Join ["-", [!Select [2, !Ref SecretStacks], "SecretArn"]]
+                - !Ref AWS::NoValue
+            LogConfiguration:  
+              LogDriver: awslogs
+              Options:
+                awslogs-region: !Ref AWS::Region
+                awslogs-group: !Ref LogGroup
+                awslogs-stream-prefix: ecs
+                mode: non-blocking
+            MountPoints:
+              - !If
+                - Container3HasMountPoint1
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container3MountPoint1]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container3MountPoint1]]
+                  ReadOnly:
+                    !Select [2, !Split [",", !Ref Container3MountPoint1]]
+                - !Ref AWS::NoValue
+              - !If
+                - Container3HasMountPoint2
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container3MountPoint2]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container3MountPoint2]]
+                  ReadOnly:
+                    !Select [2, !Split [",", !Ref Container3MountPoint2]]
+                - !Ref AWS::NoValue
+              - !If
+                - Container3HasMountPoint3
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container3MountPoint3]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container3MountPoint3]]
+                  ReadOnly:
+                    !Select [2, !Split [",", !Ref Container3MountPoint3]]
+                - !Ref AWS::NoValue
+          - !Ref AWS::NoValue
+        - !If
+          - HasAtLeast4TargetContainersCondition
+          - Name:
+              Fn::ImportValue:
+                !Join ["-", [!Select [3, !Ref ECRStacks], "ECRName"]]
+            Image: !Join
+              - ""
+              - - !Ref AWS::AccountId
+                - ".dkr.ecr."
+                - !Ref AWS::Region
+                - ".amazonaws.com/"
+                - Fn::ImportValue:
+                    !Join ["-", [!Select [3, !Ref ECRStacks], "ECRName"]]
+                - ":"
+                - !Select [3, !Ref ECRTaskTags]
+            PortMappings: !If
+              - Container4HasExposedPorts
+              - - ContainerPort: !Select [3, !Ref ECRTaskContainerPorts]
+                  HostPort: !If
+                    - EnableDynamicPortsCondition
+                    - !Ref AWS::NoValue
+                    - !Select [3, !Ref ECRTaskContainerPorts]
+              - !Ref AWS::NoValue
+            Links:
+              - !If
+                - Container4Has1OrMoreContainerDependencies
+                - !Join
+                  - ":"
+                  - - Fn::ImportValue: !Join
+                        - "-"
+                        - - !Select
+                            - !Select [
+                                0,
+                                !Ref Container4ContainerDependencyList,
+                              ]
+                            - !Ref ECRStacks
+                          - "ECRName"
+                    - !Select [0, !Ref Container4ContainerDependencyLinkNames]
+                - !Ref AWS::NoValue
+            DependsOn:
+              - !If
+                - Container4Has1OrMoreContainerDependencies
+                - Condition: START
+                  ContainerName:
+                    Fn::ImportValue: !Join
+                      - "-"
+                      - - !Select
+                          - !Select [0, !Ref Container4ContainerDependencyList]
+                          - !Ref ECRStacks
+                        - "ECRName"
+                - !Ref AWS::NoValue
+            MemoryReservation: !If
+              - ContainersHaveMemoryReservationsCondition
+              - !Select [3, !Ref MemoryReservations]
+              - !Ref AWS::NoValue
+            # Send logs to CloudWatch Logs
+            Secrets:
+              - !If
+                - Target4UsesSecretStack
+                - Name: ENV_FROM_JSON
+                  ValueFrom:
+                    Fn::ImportValue:
+                      !Join ["-", [!Select [3, !Ref SecretStacks], "SecretArn"]]
+                - !Ref AWS::NoValue
+            LogConfiguration:  
+              LogDriver: awslogs
+              Options:
+                awslogs-region: !Ref AWS::Region
+                awslogs-group: !Ref LogGroup
+                awslogs-stream-prefix: ecs
+                mode: non-blocking
+            MountPoints:
+              - !If
+                - Container4HasMountPoint1
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container4MountPoint1]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container4MountPoint1]]
+                  ReadOnly:
+                    !Select [2, !Split [",", !Ref Container4MountPoint1]]
+                - !Ref AWS::NoValue
+              - !If
+                - Container4HasMountPoint2
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container4MountPoint2]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container4MountPoint2]]
+                  ReadOnly:
+                    !Select [2, !Split [",", !Ref Container4MountPoint2]]
+                - !Ref AWS::NoValue
+              - !If
+                - Container4HasMountPoint3
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container4MountPoint3]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container4MountPoint3]]
+                  ReadOnly:
+                    !Select [2, !Split [",", !Ref Container4MountPoint3]]
+                - !Ref AWS::NoValue
+          - !Ref AWS::NoValue
+        - !If
+          - HasAtLeast5TargetContainersCondition
+          - Name:
+              Fn::ImportValue:
+                !Join ["-", [!Select [4, !Ref ECRStacks], "ECRName"]]
+            Image: !Join
+              - ""
+              - - !Ref AWS::AccountId
+                - ".dkr.ecr."
+                - !Ref AWS::Region
+                - ".amazonaws.com/"
+                - Fn::ImportValue:
+                    !Join ["-", [!Select [4, !Ref ECRStacks], "ECRName"]]
+                - ":"
+                - !Select [4, !Ref ECRTaskTags]
+            PortMappings: !If
+              - Container5HasExposedPorts
+              - - ContainerPort: !Select [4, !Ref ECRTaskContainerPorts]
+                  HostPort: !If
+                    - EnableDynamicPortsCondition
+                    - !Ref AWS::NoValue
+                    - !Select [4, !Ref ECRTaskContainerPorts]
+              - !Ref AWS::NoValue
+            Links:
+              - !If
+                - Container5Has1OrMoreContainerDependencies
+                - !Join
+                  - ":"
+                  - - Fn::ImportValue: !Join
+                        - "-"
+                        - - !Select
+                            - !Select [
+                                0,
+                                !Ref Container5ContainerDependencyList,
+                              ]
+                            - !Ref ECRStacks
+                          - "ECRName"
+                    - !Select [0, !Ref Container5ContainerDependencyLinkNames]
+                - !Ref AWS::NoValue
+            DependsOn:
+              - !If
+                - Container5Has1OrMoreContainerDependencies
+                - Condition: START
+                  ContainerName:
+                    Fn::ImportValue: !Join
+                      - "-"
+                      - - !Select
+                          - !Select [0, !Ref Container5ContainerDependencyList]
+                          - !Ref ECRStacks
+                        - "ECRName"
+                - !Ref AWS::NoValue
+            MemoryReservation: !If
+              - ContainersHaveMemoryReservationsCondition
+              - !Select [4, !Ref MemoryReservations]
+              - !Ref AWS::NoValue
+            # Send logs to CloudWatch Logs
+            Secrets:
+              - !If
+                - Target5UsesSecretStack
+                - Name: ENV_FROM_JSON
+                  ValueFrom:
+                    Fn::ImportValue:
+                      !Join ["-", [!Select [4, !Ref SecretStacks], "SecretArn"]]
+                - !Ref AWS::NoValue
+            LogConfiguration:  
+              LogDriver: awslogs
+              Options:
+                awslogs-region: !Ref AWS::Region
+                awslogs-group: !Ref LogGroup
+                awslogs-stream-prefix: ecs
+                mode: non-blocking
+            MountPoints:
+              - !If
+                - Container5HasMountPoint1
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container5MountPoint1]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container5MountPoint1]]
+                  ReadOnly:
+                    !Select [2, !Split [",", !Ref Container5MountPoint1]]
+                - !Ref AWS::NoValue
+              - !If
+                - Container5HasMountPoint2
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container5MountPoint2]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container5MountPoint2]]
+                  ReadOnly:
+                    !Select [2, !Split [",", !Ref Container5MountPoint2]]
+                - !Ref AWS::NoValue
+          - !Ref AWS::NoValue
+        - !If
+          - HasAtLeast6TargetContainersCondition
+          - Name:
+              Fn::ImportValue:
+                !Join ["-", [!Select [5, !Ref ECRStacks], "ECRName"]]
+            Image: !Join
+              - ""
+              - - !Ref AWS::AccountId
+                - ".dkr.ecr."
+                - !Ref AWS::Region
+                - ".amazonaws.com/"
+                - Fn::ImportValue:
+                    !Join ["-", [!Select [5, !Ref ECRStacks], "ECRName"]]
+                - ":"
+                - !Select [5, !Ref ECRTaskTags]
+            PortMappings: !If
+              - Container6HasExposedPorts
+              - - ContainerPort: !Select [5, !Ref ECRTaskContainerPorts]
+                  HostPort: !If
+                    - EnableDynamicPortsCondition
+                    - !Ref AWS::NoValue
+                    - !Select [5, !Ref ECRTaskContainerPorts]
+              - !Ref AWS::NoValue
+            Links:
+              - !If
+                - Container6Has1OrMoreContainerDependencies
+                - !Join
+                  - ":"
+                  - - Fn::ImportValue: !Join
+                        - "-"
+                        - - !Select
+                            - !Select [
+                                0,
+                                !Ref Container6ContainerDependencyList,
+                              ]
+                            - !Ref ECRStacks
+                          - "ECRName"
+                    - !Select [0, !Ref Container6ContainerDependencyLinkNames]
+                - !Ref AWS::NoValue
+            DependsOn:
+              - !If
+                - Container6Has1OrMoreContainerDependencies
+                - Condition: START
+                  ContainerName:
+                    Fn::ImportValue: !Join
+                      - "-"
+                      - - !Select
+                          - !Select [0, !Ref Container6ContainerDependencyList]
+                          - !Ref ECRStacks
+                        - "ECRName"
+                - !Ref AWS::NoValue
+            MemoryReservation: !If
+              - ContainersHaveMemoryReservationsCondition
+              - !Select [5, !Ref MemoryReservations]
+              - !Ref AWS::NoValue
+            # Send logs to CloudWatch Logs
+            Secrets:
+              - !If
+                - Target6UsesSecretStack
+                - Name: ENV_FROM_JSON
+                  ValueFrom:
+                    Fn::ImportValue:
+                      !Join ["-", [!Select [5, !Ref SecretStacks], "SecretArn"]]
+                - !Ref AWS::NoValue
+            LogConfiguration:  
+              LogDriver: awslogs
+              Options:
+                awslogs-region: !Ref AWS::Region
+                awslogs-group: !Ref LogGroup
+                awslogs-stream-prefix: ecs
+                mode: non-blocking
+            MountPoints:
+              - !If
+                - Container6HasMountPoint1
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container6MountPoint1]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container6MountPoint1]]
+                  ReadOnly:
+                    !Select [2, !Split [",", !Ref Container6MountPoint1]]
+                - !Ref AWS::NoValue
+              - !If
+                - Container6HasMountPoint2
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container6MountPoint2]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container6MountPoint2]]
+                  ReadOnly:
+                    !Select [2, !Split [",", !Ref Container6MountPoint2]]
+                - !Ref AWS::NoValue
+              - !If
+                - Container6HasMountPoint3
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container6MountPoint3]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container6MountPoint3]]
+                  ReadOnly:
+                    !Select [2, !Split [",", !Ref Container6MountPoint3]]
+                - !Ref AWS::NoValue
+          - !Ref AWS::NoValue
+        - !If
+          - HasAtLeast7TargetContainersCondition
+          - Name:
+              Fn::ImportValue:
+                !Join ["-", [!Select [6, !Ref ECRStacks], "ECRName"]]
+            Image: !Join
+              - ""
+              - - !Ref AWS::AccountId
+                - ".dkr.ecr."
+                - !Ref AWS::Region
+                - ".amazonaws.com/"
+                - Fn::ImportValue:
+                    !Join ["-", [!Select [6, !Ref ECRStacks], "ECRName"]]
+                - ":"
+                - !Select [6, !Ref ECRTaskTags]
+            PortMappings: !If
+              - Container7HasExposedPorts
+              - - ContainerPort: !Select [6, !Ref ECRTaskContainerPorts]
+                  HostPort: !If
+                    - EnableDynamicPortsCondition
+                    - !Ref AWS::NoValue
+                    - !Select [6, !Ref ECRTaskContainerPorts]
+              - !Ref AWS::NoValue
+            Links:
+              - !If
+                - Container7Has1OrMoreContainerDependencies
+                - !Join
+                  - ":"
+                  - - Fn::ImportValue: !Join
+                        - "-"
+                        - - !Select
+                            - !Select [
+                                0,
+                                !Ref Container7ContainerDependencyList,
+                              ]
+                            - !Ref ECRStacks
+                          - "ECRName"
+                    - !Select [0, !Ref Container7ContainerDependencyLinkNames]
+                - !Ref AWS::NoValue
+            DependsOn:
+              - !If
+                - Container7Has1OrMoreContainerDependencies
+                - Condition: START
+                  ContainerName:
+                    Fn::ImportValue: !Join
+                      - "-"
+                      - - !Select
+                          - !Select [0, !Ref Container7ContainerDependencyList]
+                          - !Ref ECRStacks
+                        - "ECRName"
+                - !Ref AWS::NoValue
+            MemoryReservation: !If
+              - ContainersHaveMemoryReservationsCondition
+              - !Select [6, !Ref MemoryReservations]
+              - !Ref AWS::NoValue
+            # Send logs to CloudWatch Logs
+            Secrets:
+              - !If
+                - Target7UsesSecretStack
+                - Name: ENV_FROM_JSON
+                  ValueFrom:
+                    Fn::ImportValue:
+                      !Join ["-", [!Select [6, !Ref SecretStacks], "SecretArn"]]
+                - !Ref AWS::NoValue
+            LogConfiguration:  
+              LogDriver: awslogs
+              Options:
+                awslogs-region: !Ref AWS::Region
+                awslogs-group: !Ref LogGroup
+                awslogs-stream-prefix: ecs
+                mode: non-blocking
+            MountPoints:
+              - !If
+                - Container7HasMountPoint1
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container7MountPoint1]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container7MountPoint1]]
+                  ReadOnly:
+                    !Select [2, !Split [",", !Ref Container7MountPoint1]]
+                - !Ref AWS::NoValue
+              - !If
+                - Container7HasMountPoint2
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container7MountPoint2]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container7MountPoint2]]
+                  ReadOnly:
+                    !Select [2, !Split [",", !Ref Container7MountPoint2]]
+                - !Ref AWS::NoValue
+              - !If
+                - Container7HasMountPoint3
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container7MountPoint3]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container7MountPoint3]]
+                  ReadOnly:
+                    !Select [2, !Split [",", !Ref Container7MountPoint3]]
+                - !Ref AWS::NoValue
+          - !Ref AWS::NoValue
+        - Name:
+            Fn::ImportValue:
+              !Join ["-", [!Select [0, !Ref ECRStacks], "ECRName"]]
+          Image: !Join
+            - ""
+            - - !Ref AWS::AccountId
+              - ".dkr.ecr."
+              - !Ref AWS::Region
+              - ".amazonaws.com/"
+              - Fn::ImportValue:
+                  !Join ["-", [!Select [0, !Ref ECRStacks], "ECRName"]]
+              - ":"
+              - !Select [0, !Ref ECRTaskTags]
+          Command: !If
+            - Container1ContainerHasCommand
+            - !Ref Container1ContainerCommand
+            - !Ref AWS::NoValue
+          Links:
+            - !If
+              - Container1Has1OrMoreContainerDependencies
+              - !Join
+                - ":"
+                - - Fn::ImportValue: !Join
+                      - "-"
+                      - - !Select
+                          - !Select [0, !Ref Container1ContainerDependencyList]
+                          - !Ref ECRStacks
+                        - "ECRName"
+                  - !Select [0, !Ref Container1ContainerDependencyLinkNames]
+              - !Ref AWS::NoValue
+          PortMappings: !If
+            - Container1HasExposedPorts
+            - - ContainerPort: !Select [0, !Ref ECRTaskContainerPorts]
+                HostPort: !If
+                  - EnableDynamicPortsCondition
+                  - !Ref AWS::NoValue
+                  - !Select [0, !Ref ECRTaskContainerPorts]
+            - !Ref AWS::NoValue
+          DependsOn:
+            - !If
+              - Container1Has1OrMoreContainerDependencies
+              - Condition: START
+                ContainerName:
+                  Fn::ImportValue: !Join
+                    - "-"
+                    - - !Select
+                        - !Select [0, !Ref Container1ContainerDependencyList]
+                        - !Ref ECRStacks
+                      - "ECRName"
+              - !Ref AWS::NoValue
+          MemoryReservation: !If
+            - ContainersHaveMemoryReservationsCondition
+            - !Select [0, !Ref MemoryReservations]
+            - !Ref AWS::NoValue
+          # Send logs to CloudWatch Logs
+          Secrets:
+            - !If
+              - Target1UsesSecretStack
+              - Name: ENV_FROM_JSON
+                ValueFrom:
+                  Fn::ImportValue:
+                    !Join ["-", [!Select [0, !Ref SecretStacks], "SecretArn"]]
+              - !Ref AWS::NoValue
+          LogConfiguration:  
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref LogGroup
+              awslogs-stream-prefix: ecs
+              mode: non-blocking
+          MountPoints:
+            - !If
+              - Container1HasMountPoint1
+              - ContainerPath:
+                  !Select [0, !Split [",", !Ref Container1MountPoint1]]
+                SourceVolume:
+                  !Select [1, !Split [",", !Ref Container1MountPoint1]]
+                ReadOnly: !Select [2, !Split [",", !Ref Container1MountPoint1]]
+              - !Ref AWS::NoValue
+            - !If
+              - Container1HasMountPoint2
+              - ContainerPath:
+                  !Select [0, !Split [",", !Ref Container1MountPoint2]]
+                SourceVolume:
+                  !Select [1, !Split [",", !Ref Container1MountPoint2]]
+                ReadOnly: !Select [2, !Split [",", !Ref Container1MountPoint2]]
+              - !Ref AWS::NoValue
+            - !If
+              - Container1HasMountPoint3
+              - ContainerPath:
+                  !Select [0, !Split [",", !Ref Container1MountPoint3]]
+                SourceVolume:
+                  !Select [1, !Split [",", !Ref Container1MountPoint3]]
+                ReadOnly: !Select [2, !Split [",", !Ref Container1MountPoint3]]
+              - !Ref AWS::NoValue
+  # A role needed by ECS
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ["", [!Ref ServiceName, ExecutionRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: AllowECRContainerPull
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: "ecr:*"
+                Resource: "*"
+        - PolicyName: AllowRetrieveSecrets
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "secretsmanager:GetSecretValue"
+                  - "kms:Decrypt"
+                Resource:
+                  - "*"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+  # A role for the containers
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ["", [!Ref ServiceName, TaskRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: !Sub "${AWS::StackName}-AllowCloudWatchLogPolicy"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "cloudwatch:*"
+                Resource:
+                  - "*"
+        - PolicyName: !Sub "${AWS::StackName}-AllowCRUDS3Policy"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "s3:*"
+                Resource:
+                  - "*"
+        - PolicyName: !Sub "${AWS::StackName}-AllEcsExecPolicy"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "ecs:ExecuteCommand"
+                  - "ssmmessages:CreateControlChannel"
+                  - "ssmmessages:CreateDataChannel"
+                  - "ssmmessages:OpenControlChannel"
+                  - "ssmmessages:OpenDataChannel"
+                Resource:
+                  - "*"
+        - PolicyName: !Sub "${AWS::StackName}-AllowRetrieveSecrets"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "secretsmanager:GetSecretValue"
+                  - "kms:Decrypt"
+                Resource:
+                  - "*"
+  # A role needed for auto scaling
+ 
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ["", [/ecs/, !Ref ServiceName, TaskDefinition]]
+  FirelensLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        !Join ["", [/firelens-container/, !Ref ServiceName, TaskDefinition]]
+  

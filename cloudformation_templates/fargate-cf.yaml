@@ -1,0 +1,692 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: An example CloudFormation template for Fargate.
+Parameters:
+  AutoScalingTargetValue:
+    Type: Number
+    Default: 50
+  CertificateStackName:
+    Type: String
+    Default: ''
+  ECRStacks:
+    Description: Comma separated list of stacks containing ECS repositories 
+    Type: CommaDelimitedList
+    Default: ''
+  ECRTaskContainerCpus:
+    Type: List<Number>
+  ECRTaskContainerMemories:
+    Type: List<Number>
+  ECRTaskContainerPorts:
+    Type: List<Number>
+  ECRTaskCpu:
+    Description: The number of cpu units used by the task. 
+    Type: String
+    Default: 2048
+  ECRTaskMemory:
+    Description: The amount (in MiB) of memory used by the task.
+    Type: String
+    Default: 8192
+  ECRTaskTags:
+    Description: Comma separated list of tags to associate with the tasks
+    Type: CommaDelimitedList
+    Default: ''
+  EnableFirelens:
+    Description: Enable log streaming through Kinesis Firehose
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+  EnableLoadBalancerLogging:
+    Description: Enable logging of ALB access logs to S3
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+  HealthCheckPath:
+    Type: String
+    Default: /
+  LoadBalancerPublicCount:
+    Type: Number
+    Default: 1
+    MinValue: 0
+    MaxValue: 5
+  LoadBalancerPublicPorts:
+    Type: List<Number>
+    Default: 443
+  MaxContainers:
+    Type: Number
+    Default: 10
+  MinContainers:
+    Type: Number
+    Default: 2
+  NumberOfContainers:
+    Type: Number
+    MinValue: 0
+    MaxValue: 5
+  Route53StackName:
+    Type: String
+  ServiceName:
+    Type: String
+  Subdomain:
+    Type: String
+    Default: ''
+  VPCStackName:
+    Description: Name of the stack used to create the VPC
+    Type: String
+Conditions:
+  EnableFirelensCondition: !Equals
+    - !Ref EnableFirelens
+    - true 
+  EnableLoadBalancerLoggingCondition: !Equals
+    - !Ref EnableLoadBalancerLogging
+    - true 
+  HasCertificateCondition: !Not
+    - !Equals 
+      - !Ref CertificateStackName
+      - ''
+  HasZeroTargetContainersCondition: !Equals
+    - !Ref NumberOfContainers
+    - 0
+  Has1OrMoreTargetContainersCondition: !Not
+    - !Equals 
+      - !Ref NumberOfContainers
+      - 0
+  Has2OrMoreTargetContainersCondition: !Or
+    - !Equals 
+      - !Ref NumberOfContainers
+      - 2
+    - !Equals 
+      - !Ref NumberOfContainers
+      - 3
+    - !Equals 
+      - !Ref NumberOfContainers
+      - 4
+    - !Equals 
+      - !Ref NumberOfContainers
+      - 5
+  Has3OrMoreTargetContainersCondition: !Or
+    - !Equals 
+      - !Ref NumberOfContainers
+      - 3
+    - !Equals 
+      - !Ref NumberOfContainers
+      - 4
+    - !Equals 
+      - !Ref NumberOfContainers
+      - 5
+  Has4OrMoreTargetContainersCondition: !Or
+    - !Equals 
+      - !Ref NumberOfContainers
+      - 4
+    - !Equals 
+      - !Ref NumberOfContainers
+      - 5
+  Has5TargetContainersCondition: !Equals 
+    - !Ref NumberOfContainers
+    - 5
+  HasZeroLoadBalancerPublicPortsCondition: !Equals
+    - !Ref LoadBalancerPublicCount
+    - 0
+  Has1OrMoreLoadBalancerPublicPortsCondition: !Not
+    - !Equals 
+      - !Ref LoadBalancerPublicCount
+      - 0
+  Has2OrMoreLoadBalancerPublicPortsCondition: !Or
+    - !Equals 
+      - !Ref LoadBalancerPublicCount
+      - 2
+    - !Equals 
+      - !Ref LoadBalancerPublicCount
+      - 3
+    - !Equals 
+      - !Ref LoadBalancerPublicCount
+      - 4
+    - !Equals 
+      - !Ref LoadBalancerPublicCount
+      - 5
+  Has3OrMoreLoadBalancerPublicPortsCondition: !Or
+    - !Equals 
+      - !Ref LoadBalancerPublicCount
+      - 3
+    - !Equals 
+      - !Ref LoadBalancerPublicCount
+      - 4
+    - !Equals 
+      - !Ref LoadBalancerPublicCount
+      - 5
+  Has4OrMoreLoadBalancerPublicPortsCondition: !Or
+    - !Equals 
+      - !Ref LoadBalancerPublicCount
+      - 4
+    - !Equals 
+      - !Ref LoadBalancerPublicCount
+      - 5
+  Has5TargetLoadBalancerPublicPortsCondition: !Equals 
+    - !Ref LoadBalancerPublicCount
+    - 5
+Mappings:
+  RegionARNPrefix:
+    us-east-1:
+      ARNPrefix: 'arn:aws:'
+    us-west-1:
+      ARNPrefix: 'arn:aws:'
+    us-west-2:
+      ARNPrefix: 'arn:aws:'
+    eu-west-1:
+      ARNPrefix: 'arn:aws:'
+    ap-northeast-1:
+      ARNPrefix: 'arn:aws:'
+    ap-northeast-2:
+      ARNPrefix: 'arn:aws:'
+    ap-southeast-1:
+      ARNPrefix: 'arn:aws:'
+    ap-southeast-2:
+      ARNPrefix: 'arn:aws:'
+    ap-south-1:
+      ARNPrefix: 'arn:aws:'
+    us-east-2:
+      ARNPrefix: 'arn:aws:'
+    sa-east-1:
+      ARNPrefix: 'arn:aws:'
+    cn-north-1:
+      ARNPrefix: 'arn:aws-cn:'
+    eu-central-1:
+      ARNPrefix: 'arn:aws:'
+  RegionELBAccountId:
+    us-east-1:
+      AccountId: '127311923021'
+    us-west-1:
+      AccountId: '027434742980'
+    us-west-2:
+      AccountId: '797873946194'
+    eu-west-1:
+      AccountId: '156460612806'
+    ap-northeast-1:
+      AccountId: '582318560864'
+    ap-northeast-2:
+      AccountId: '600734575887'
+    ap-southeast-1:
+      AccountId: '114774131450'
+    ap-southeast-2:
+      AccountId: '783225319266'
+    ap-south-1:
+      AccountId: '718504428378'
+    us-east-2:
+      AccountId: '033677994240'
+    sa-east-1:
+      AccountId: '507241528517'
+    cn-north-1:
+      AccountId: '638102146993'
+    eu-central-1:
+      AccountId: '054676820928'
+Resources:
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Join ['-', [!Ref ServiceName, Cluster]]
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Condition: Has1OrMoreTargetContainersCondition
+    Properties:
+      # Name of the task definition. Subsequent versions of the task definition are grouped together under this name.
+      Family: !Join ['-', [!Ref ServiceName, TaskDefinition1]]
+      # awsvpc is required for Fargate
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      # 256 (.25 vCPU) - Available memory values: 0.5GB, 1GB, 2GB
+      # 512 (.5 vCPU) - Available memory values: 1GB, 2GB, 3GB, 4GB
+      # 1024 (1 vCPU) - Available memory values: 2GB, 3GB, 4GB, 5GB, 6GB, 7GB, 8GB
+      # 2048 (2 vCPU) - Available memory values: Between 4GB and 16GB in 1GB increments
+      # 4096 (4 vCPU) - Available memory values: Between 8GB and 30GB in 1GB increments
+      Cpu: !Ref ECRTaskCpu
+      # 0.5GB, 1GB, 2GB - Available cpu values: 256 (.25 vCPU)
+      # 1GB, 2GB, 3GB, 4GB - Available cpu values: 512 (.5 vCPU)
+      # 2GB, 3GB, 4GB, 5GB, 6GB, 7GB, 8GB - Available cpu values: 1024 (1 vCPU)
+      # Between 4GB and 16GB in 1GB increments - Available cpu values: 2048 (2 vCPU)
+      # Between 8GB and 30GB in 1GB increments - Available cpu values: 4096 (4 vCPU)
+      Memory: !Ref ECRTaskMemory
+      # A role needed by ECS.
+      # "The ARN of the task execution role that containers in this task can assume. All containers in this task are granted the permissions that are specified in this role."
+      # "There is an optional task execution IAM role that you can specify with Fargate to allow your Fargate tasks to make API calls to Amazon ECR."
+      ExecutionRoleArn: !Ref TaskExecutionRole
+      # "The Amazon Resource Name (ARN) of an AWS Identity and Access Management (IAM) role that grants containers in the task permission to call AWS APIs on your behalf."
+      TaskRoleArn: !Ref TaskRole
+      ContainerDefinitions:
+        - !If 
+          - EnableFirelensCondition
+          - Name: log_router
+            Image: !Sub '906394416424.dkr.ecr.${AWS::Region}.amazonaws.com/aws-for-fluent-bit:latest'
+            Essential: true
+            FirelensConfiguration:
+              Type: fluentbit
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-region: !Ref AWS::Region
+                awslogs-group: !Ref FirelensLogGroup
+                awslogs-stream-prefix: firelens
+                mode: non-blocking
+            MemoryReservation: 50
+          - !Ref AWS::NoValue
+        - Name: 
+            Fn::ImportValue: !Join [ "-", [ !Select [0, !Ref ECRStacks], "ECRName"]]
+          Image: !Join
+            - ''
+            - - !Ref AWS::AccountId
+              - ".dkr.ecr."
+              - !Ref AWS::Region
+              - '.amazonaws.com/'
+              - Fn::ImportValue: !Join [ "-", [ !Select [0, !Ref ECRStacks], "ECRName"]]
+              - ":"
+              - !Select [0, !Ref ECRTaskTags]
+          PortMappings:
+            - ContainerPort: !Select [0, !Ref ECRTaskContainerPorts]
+          Environment:
+            - Name: COMPOSER_HOME
+              Value: /root
+            - Name: PARAM1
+              Value: local
+            - Name: RDS_DB_NAME
+              Value: ebdb
+            - Name: RDS_HOSTNAME
+              Value: aurora-sector-global-sectorglobal-dev-aurora-serverless-mysql.cluster-crsphoh5slrn.eu-west-1.rds.amazonaws.com
+            - Name: RDS_USERNAME
+              Value: sgroot
+            - Name: RDS_PASSWORD
+              Value: a!3%KpMnX4mx
+            - Name: RDS_PORT
+              Value: 3306
+          # Send logs to CloudWatch Logs
+          LogConfiguration: !If
+            - EnableFirelensCondition
+            - LogDriver: awsfirelens
+              Options:
+                Name: firehose
+                Region: !Ref AWS::Region
+                delivery_stream: !Ref KinesisFirehoseDeliveryStream
+            - LogDriver: awslogs
+              Options:
+                awslogs-region: !Ref AWS::Region
+                awslogs-group: !Ref LogGroup
+                awslogs-stream-prefix: ecs
+                mode: non-blocking
+  # A role needed by ECS
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref ServiceName, ExecutionRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: AllowECRContainerPull
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'ecr:*'
+                Resource: '*'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+  # A role for the containers
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref ServiceName, TaskRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      # ManagedPolicyArns:
+      #   -
+      Policies:
+        - !If 
+          - EnableFirelensCondition
+          - PolicyName: AllowKinesisStreamDataPosting
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Effect: Allow
+                  Action: 'firehose:PutRecordBatch'
+                  Resource: !GetAtt KinesisFirehoseDeliveryStream.Arn
+          - !Ref AWS::NoValue
+  # A role needed for auto scaling
+  AutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref ServiceName, AutoScalingRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole'
+  ContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Join ['', [!Ref ServiceName, ContainerSecurityGroup]]
+      VpcId: 
+        Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, "VPCID"]]
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Select [0, !Ref ECRTaskContainerPorts]
+          ToPort: !Select [0, !Ref ECRTaskContainerPorts]
+          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Join ['', [!Ref ServiceName, LoadBalancerSecurityGroup]]
+      VpcId: 
+        Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, "VPCID"]]
+      SecurityGroupIngress:
+        - !If 
+          - Has1OrMoreLoadBalancerPublicPortsCondition
+          - IpProtocol: tcp
+            FromPort:  !Select [0, !Ref LoadBalancerPublicPorts]
+            ToPort:  !Select [0, !Ref LoadBalancerPublicPorts]
+            CidrIp: 0.0.0.0/0
+          - !Ref AWS::NoValue
+        - !If 
+          - Has2OrMoreLoadBalancerPublicPortsCondition
+          - IpProtocol: tcp
+            FromPort:  !Select [1, !Ref LoadBalancerPublicPorts]
+            ToPort:  !Select [1, !Ref LoadBalancerPublicPorts]
+            CidrIp: 0.0.0.0/0
+          - !Ref AWS::NoValue
+        - !If 
+          - Has3OrMoreLoadBalancerPublicPortsCondition
+          - IpProtocol: tcp
+            FromPort:  !Select [2, !Ref LoadBalancerPublicPorts]
+            ToPort:  !Select [2, !Ref LoadBalancerPublicPorts]
+            CidrIp: 0.0.0.0/0
+          - !Ref AWS::NoValue
+        - !If 
+          - Has4OrMoreLoadBalancerPublicPortsCondition
+          - IpProtocol: tcp
+            FromPort:  !Select [3, !Ref LoadBalancerPublicPorts]
+            ToPort:  !Select [3, !Ref LoadBalancerPublicPorts]
+            CidrIp: 0.0.0.0/0
+          - !Ref AWS::NoValue
+        - !If 
+          - Has5TargetLoadBalancerPublicPortsCondition
+          - IpProtocol: tcp
+            FromPort:  !Select [4, !Ref LoadBalancerPublicPorts]
+            ToPort:  !Select [4, !Ref LoadBalancerPublicPorts]
+            CidrIp: 0.0.0.0/0
+          - !Ref AWS::NoValue
+  Service:
+    Type: AWS::ECS::Service
+    # This dependency is needed so that the load balancer is setup correctly in time
+    DependsOn: ListenerHTTP
+    Properties: 
+      ServiceName: !Ref ServiceName
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref TaskDefinition
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+      DesiredCount: 1
+      # This may need to be adjusted if the container takes a while to start up
+      HealthCheckGracePeriodSeconds: 30
+      LaunchType: FARGATE
+      NetworkConfiguration: 
+        AwsvpcConfiguration:
+          # change to DISABLED if you're using private subnets that have access to a NAT gateway
+          AssignPublicIp: DISABLED
+          Subnets:
+            - Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, "PrivateSubnet1AID"]]
+            - Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, "PrivateSubnet1BID"]]
+          SecurityGroups:
+            - !Ref ContainerSecurityGroup
+      LoadBalancers:
+        - ContainerName: 
+            Fn::ImportValue: !Join [ "-", [ !Select [0, !Ref ECRStacks], "ECRName"]]
+          ContainerPort: !Select [0, !Ref ECRTaskContainerPorts]
+          TargetGroupArn: !Ref TargetGroup
+      PlatformVersion: 1.4.0
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      # will look for a 200 status code by default unless specified otherwise
+      HealthCheckPath: !Ref HealthCheckPath
+      HealthCheckTimeoutSeconds: 5
+      UnhealthyThresholdCount: 2
+      HealthyThresholdCount: 2
+      Name: !Join ['', [!Ref ServiceName, TargetGroup]]
+      Port: !Select [0, !Ref ECRTaskContainerPorts]
+      Protocol: HTTP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '60' # default is 300
+      TargetType: ip
+      VpcId:
+        Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, "VPCID"]]
+  ListenerHTTP:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref TargetGroup
+          Type: forward
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+  ListenerHTTPS:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: HasCertificateCondition
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref TargetGroup
+          Type: forward
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: 
+            Fn::ImportValue: !Join [ "-", [ !Ref CertificateStackName, "CertificateArn"]]
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    DependsOn: S3LoadBalancerAccessLogsBucketPolicy
+    Properties:
+      LoadBalancerAttributes:
+        # this is the default, but is specified here in case it needs to be changed
+        - Key: idle_timeout.timeout_seconds
+          Value: '60'
+        - !If 
+          - EnableLoadBalancerLoggingCondition
+          - Key: access_logs.s3.enabled
+            Value: true 
+          - !Ref AWS::NoValue
+        - !If 
+          - EnableLoadBalancerLoggingCondition
+          - Key: access_logs.s3.bucket
+            Value: !Ref S3LoadBalancerAccessLogsBucket
+          - !Ref AWS::NoValue
+        - !If 
+          - EnableLoadBalancerLoggingCondition
+          - Key: access_logs.s3.prefix
+            Value: Logs
+          - !Ref AWS::NoValue
+      Name: !Join ['', [!Ref ServiceName, LoadBalancer]]
+      # "internal" is also an option
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+      Subnets:
+        - Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, "PublicSubnet1ID"]]
+        - Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, "PublicSubnet2ID"]]
+  # DNSRecord:
+  #   Type: AWS::Route53::RecordSet
+  #   Properties:
+  #     HostedZoneName: !Join ['', [!Ref HostedZoneName, .]]
+  #     Name: !Join ['', [!Ref Subdomain, ., !Ref HostedZoneName, .]]
+  #     Type: A
+  #     AliasTarget:
+  #       DNSName: !GetAtt LoadBalancer.DNSName
+  #       HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneID
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ['', [/ecs/, !Ref ServiceName, TaskDefinition]]
+  FirelensLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ['', [/firelens-container/, !Ref ServiceName, TaskDefinition]]
+  AutoScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MinCapacity: !Ref MinContainers
+      MaxCapacity: !Ref MaxContainers
+      ResourceId: !Join ['/', [service, !Ref Cluster, !GetAtt Service.Name]]
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+      # "The Amazon Resource Name (ARN) of an AWS Identity and Access Management (IAM) role that allows Application Auto Scaling to modify your scalable target."
+      RoleARN: !GetAtt AutoScalingRole.Arn
+  AutoScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Join ['', [!Ref ServiceName, AutoScalingPolicy]]
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref AutoScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        ScaleInCooldown: 10
+        ScaleOutCooldown: 10
+        # Keep things at or lower than 50% CPU utilization, for example
+        TargetValue: !Ref AutoScalingTargetValue
+  KinesisFirehoseDeliveryStream:
+    Condition: EnableFirelensCondition
+    DependsOn:
+      - KinesisStreamDeliveryPolicy
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Properties:
+      ExtendedS3DestinationConfiguration:
+        BucketARN: !Join 
+          - ''
+          - - 'arn:aws:s3:::'
+            - !Ref KinesisStreamS3DeliveryBucket
+        BufferingHints:
+          IntervalInSeconds: '60'
+          SizeInMBs: '50'
+        CompressionFormat: UNCOMPRESSED
+        Prefix: firehose/
+        RoleARN: !GetAtt KinesisStreamDeliveryRole.Arn
+        # ProcessingConfiguration:
+        #   Enabled: 'true'
+        #   Processors:
+        #     - Parameters:
+        #         - ParameterName: LambdaArn
+        #           ParameterValue: !GetAtt myLambda.Arn 
+        #       Type: Lambda 
+  KinesisStreamS3DeliveryBucket:
+    Condition: EnableFirelensCondition
+    Type: AWS::S3::Bucket
+    Properties:
+      VersioningConfiguration:
+        Status: Enabled
+  KinesisStreamDeliveryRole:
+    Condition: EnableFirelensCondition
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: ''
+            Effect: Allow
+            Principal:
+              Service: firehose.amazonaws.com
+            Action: 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                'sts:ExternalId': !Ref 'AWS::AccountId'
+  KinesisStreamDeliveryPolicy:
+    Condition: EnableFirelensCondition
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: firehose_delivery_policy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - 's3:AbortMultipartUpload'
+              - 's3:GetBucketLocation'
+              - 's3:GetObject'
+              - 's3:ListBucket'
+              - 's3:ListBucketMultipartUploads'
+              - 's3:PutObject'
+            Resource:
+              - !Join 
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref KinesisStreamS3DeliveryBucket
+              - !Join 
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref KinesisStreamS3DeliveryBucket
+                  - '*'
+      Roles:
+        - !Ref KinesisStreamDeliveryRole
+  S3LoadBalancerAccessLogsBucket:
+    Condition: EnableLoadBalancerLoggingCondition
+    DeletionPolicy: Retain
+    Type: AWS::S3::Bucket
+  S3LoadBalancerAccessLogsBucketPolicy:
+    Condition: EnableLoadBalancerLoggingCondition
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3LoadBalancerAccessLogsBucket
+      PolicyDocument:
+        Statement:
+          - Sid: ELBAccessLogs20130930
+            Effect: Allow
+            Resource: !Join 
+              - ''
+              - - !FindInMap 
+                  - RegionARNPrefix
+                  - !Ref 'AWS::Region'
+                  - ARNPrefix
+                - 's3:::'
+                - !Ref 'S3LoadBalancerAccessLogsBucket'
+                - /
+                - Logs
+                - /AWSLogs/
+                - !Ref 'AWS::AccountId'
+                - /*
+            Principal:
+              AWS: !FindInMap [RegionELBAccountId, !Ref 'AWS::Region', AccountId]
+            Action: ['s3:PutObject']
+Outputs:
+  Cluster:
+    Description: Customer name
+    Value: !Ref Cluster
+    Export:
+      Name: !Sub '${AWS::StackName}-Cluster'
+  CusterArn:
+    Description: Customer ARN
+    Value: !GetAtt  Cluster.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-CusterArn'
+  KinesisFirehoseDeliveryStreamArn:
+    Description: The Amazon Resource Name (ARN) of the delivery stream
+    Value: !GetAtt KinesisFirehoseDeliveryStream.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-KinesisFirehoseDeliveryStreamArn'
+  LoadBalancerDomainName:
+    Description: The DNS name for the load balancer. 
+    Value: !GetAtt LoadBalancer.DNSName
+    Export:
+      Name: !Sub '${AWS::StackName}-LoadBalancerDomainName'
+  # Endpoint:
+  #   Description: Endpoint
+  #   Value: !Join ['', ['https://', !Ref DNSRecord]]

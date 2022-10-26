@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  Create a SQS Queue with possible Dead Litter Queue
+Parameters:
+  CreateDeadLetterQueue:
+    Description: true or false as to whether a dead letter queue is created
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+
+Conditions:
+  CreateDeadLetterQueueCondition: !Equals [!Ref CreateDeadLetterQueue, 'true'] 
+
+Resources:
+  DeadLetterQueue:
+    Condition: CreateDeadLetterQueueCondition
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Join [ '-', [!Ref AWS::StackName, 'DeadLetterQueue']]
+  SourceQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      DelaySeconds: 0
+      MessageRetentionPeriod: 3600
+      QueueName: !Join [ '-', [!Ref AWS::StackName, 'Queue']]
+      RedrivePolicy: !If
+        - CreateDeadLetterQueueCondition
+        - deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+          maxReceiveCount: 1
+        - !Ref AWS::NoValue
+      VisibilityTimeout: 30
+Outputs:
+  SourceQueueURL: 
+    Description: "URL of source queue"
+    Value: !Ref SourceQueue
+    Export: 
+      Name: !Join ['-', [!Ref AWS::StackName, 'SourceQueueURL']]
+  SourceQueueARN:
+    Description: "ARN of source queue"
+    Value: !GetAtt SourceQueue.Arn
+    Export: 
+      Name: !Join ['-', [!Ref AWS::StackName, 'SourceQueueARN']]
+  DeadLetterQueueURL: 
+    Condition: CreateDeadLetterQueueCondition
+    Description: "URL of dead-letter queue"
+    Value: !Ref "DeadLetterQueue"
+    Export: 
+      Name: !Join ['-', [!Ref AWS::StackName, 'DeadLetterQueueURL']]
+  DeadLetterQueueARN: 
+    Condition: CreateDeadLetterQueueCondition
+    Description: "ARN of dead-letter queue"
+    Value: !GetAtt DeadLetterQueue.Arn
+    Export: 
+      Name: !Join ['-', [!Ref AWS::StackName, 'DeadLetterQueueARN']]

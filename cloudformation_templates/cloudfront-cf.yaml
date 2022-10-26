@@ -1,0 +1,108 @@
+#aws cloudformation package --template-file quicksight.yaml --output-template-file quicksight-output.yaml --s3-bucket <bucket>
+#aws cloudformation deploy --template-file /<path>/quicksight-output.yaml --stack-name CognitoQuickSight --capabilities CAPABILITY_IAM
+#aws cloudformation describe-stacks --query 'Stacks[0].[Outputs[].[OutputKey,OutputValue]]|[]' --output text --stack-name CognitoQuickSight
+#Add outputs from the last command 
+
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Setup a general CloudFront distribution
+Parameters:
+  WebsiteURL:
+    Description: FQDN of the Dashboard Website
+    Type: String
+  TopLevelDomain:
+    Description: Registered TLD
+    Type: String
+  CertificateARN:
+    Type: String
+    Default: ''
+  CertStackName:
+    Type: String
+    Default: ''
+  DefaultDocument:
+    Type: String
+    Default: 'index.html'
+  CreateDNSEntries:
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+Conditions:
+  HasCertStackCondition: !Not
+    - !Equals
+      - !Ref CertStackName
+      - ''
+  HasCertArnCondition: !Equals
+    - !Ref CertificateARN
+    - ''
+  CreateDNSEntriesCondition: !Equals
+    - !Ref CreateDNSEntries
+    - true
+Resources:
+  S3WebSite:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+  CloudFrontDistro:
+    Type: 'AWS::CloudFront::Distribution'
+    Properties:
+      DistributionConfig:
+        Origins:
+        - DomainName: !Join [ ".", [ !Ref S3WebSite, "s3-website" , !Ref 'AWS::Region', "amazonaws.com" ] ]
+          Id: S3WebSite
+          CustomOriginConfig:
+            HTTPPort: 80
+            HTTPSPort: 443
+            OriginProtocolPolicy: http-only
+        Enabled: true
+        DefaultRootObject: !Ref DefaultDocument
+        DefaultCacheBehavior:
+          TargetOriginId: S3WebSite
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+          DefaultTTL: 0
+          MaxTTL: 0
+          MinTTL: 0
+          ViewerProtocolPolicy: redirect-to-https
+        ViewerCertificate:
+          AcmCertificateArn: !If
+            - HasCertStackCondition
+            - Fn::ImportValue: !Join [ "-", [ !Ref CertStackName, 'CertificateArn'] ]
+            - !Ref CertificateARN
+          SslSupportMethod: sni-only
+        Aliases: !Split [',', !Ref WebsiteURL]
+        PriceClass: PriceClass_100
+        CustomErrorResponses:
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+  CloudFrontAlias:
+    Type: AWS::Route53::RecordSet
+    Condition: CreateDNSEntriesCondition
+    Properties: 
+      AliasTarget: 
+        DNSName: !GetAtt CloudFrontDistro.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: true
+      Comment: Alias record to CloudFront fo the end-user dashbaord access
+      Failover: PRIMARY
+      HostedZoneName: !Sub "${TopLevelDomain}."
+      Name: !Select [0, !Split [',', !Ref WebsiteURL] ]
+      Type: A
+      SetIdentifier: !Join 
+        - ''
+        - - !Ref 'AWS::StackName'
+          - '-'
+          - !GetAtt CloudFrontDistro.DomainName
+Outputs:
+  S3Website:
+    Description: <S3 WebSite URL>
+    Value: !GetAtt S3WebSite.WebsiteURL
+  CloudFrontDistro:
+    Description: <CloudFront Distribution URL>
+    Value: !GetAtt CloudFrontDistro.DomainName

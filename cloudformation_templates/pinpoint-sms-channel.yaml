@@ -1,0 +1,40 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: ---
+  Template to setup an SMS Channel and, if necessary, a Pinpoint Application
+
+# Metadata: 
+
+Parameters: 
+  PinpointAppStackName:
+    Description: Name of the stack that created the Pinpoint Application.  If none is supplied, one will be created.
+    Type: String
+    Default: ''
+
+# Mappings: 
+
+Conditions: 
+  CreatePinpointApp: !Equals 
+    - !Ref PinpointAppStackName
+    - ''
+
+Resources: 
+  PinpointApp:
+    Type: AWS::Pinpoint::App
+    Condition: CreatePinpointApp
+    Properties:
+      Name: !Join [ '-', [ !Ref AWS::StackName, 'pinpoint-app']]
+  SMSChannel:
+    Type: AWS::Pinpoint::SMSChannel
+    Properties: 
+      ApplicationId: !If 
+        - CreatePinpointApp
+        - !Ref PinpointApp
+        - Fn::ImportValue: !Join [ '-', [!Ref PinpointAppStackName, 'ApplicationId'] ] 
+      Enabled: true
+      
+Outputs:
+  ApplicationId:
+    Description: Created Pinpoint App Id
+    Value: !Ref SMSChannel
+    Export: 
+      Name: !Join [ '-', [!Ref AWS::StackName, 'ApplicationId'] ]

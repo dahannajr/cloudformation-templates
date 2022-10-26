@@ -1,0 +1,112 @@
+[
+  {
+    "ParameterKey": "DBMultiAZ",
+    "ParameterValue": "true",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "DBAllocatedStorageEncrypted",
+    "ParameterValue": "true",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "DBCWLogExports",
+    "ParameterValue": "postgresql",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "RotateDBPassword",
+    "ParameterValue": "false",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "DBAutoMinorVersionUpgrade",
+    "ParameterValue": "true",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "DBBackupRetentionPeriod",
+    "ParameterValue": "35",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "DBEngineVersion",
+    "ParameterValue": "Aurora-PostgreSQL11.6",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "DBEngineMode",
+    "ParameterValue": "provisioned",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "DBAccessCIDR",
+    "ParameterValue": "172.17.48.0/20",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "DBInstanceClass",
+    "ParameterValue": "db.r5.large",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "DBSnapshotIdentifier",
+    "ParameterValue": "arn:aws:rds:us-east-1:548714908692:cluster-snapshot:winenergy-2-ards-cfbuild-snapshot-001",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "DBMasterUserPassword",
+    "ParameterValue": "Some!thing01Random",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "DBMasterUsername",
+    "ParameterValue": "postgres",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "DBPort",
+    "ParameterValue": "5432",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "DBMultiAZ",
+    "ParameterValue": "true",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "DBName",
+    "ParameterValue": "winenergy",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "EnvironmentStage",
+    "ParameterValue": "test",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "Confidentiality",
+    "ParameterValue": "pii/phi",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "Compliance",
+    "ParameterValue": "fips",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "VPCStackName",
+    "ParameterValue": "winenergy-network",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "Application",
+    "ParameterValue": "Winenergy",
+    "UsePreviousValue": false
+  },
+  {
+    "ParameterKey": "NotificationList",
+    "ParameterValue": "stanley.mchann@nreca.coop",
+    "UsePreviousValue": false
+  }
+]

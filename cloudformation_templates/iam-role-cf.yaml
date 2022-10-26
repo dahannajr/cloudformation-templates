@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  Setup the necessary roles to allow a CLI user to create and update a CloudFormation Template
+Conditions:
+  CreateGroupCondition: !Equals
+    - 1
+    - 0
+Resources:
+  CloudFormationStackManagementGroup:
+    Type: AWS::IAM::Group
+    Condition: CreateGroupCondition
+    Properties:
+      GroupName: CloudFormationStackManagementGroup
+  PassRoleToCloudFormationServiceAdminRolePolicy:
+    Type: AWS::IAM::Policy
+    Condition: CreateGroupCondition
+    Properties: 
+      PolicyDocument: !Sub 
+        - |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "VisualEditor1",
+                    "Effect": "Allow",
+                    "Action": [
+                        "iam:GetRole",
+                        "iam:PassRole"
+                    ],
+                    "Resource": "${CloudFormationServiceRoleArn}"
+                }
+            ]
+          }
+        - CloudFormationServiceRoleArn: !GetAtt  CloudFormationServiceAdminRole.Arn
+      PolicyName: !Sub '${AWS::StackName}-PassRoleToCloudFormationServiceAdminRolePolicy'
+      Groups: !If
+        - CreateGroupCondition
+        - - !Ref CloudFormationStackManagementGroup
+        - !Ref AWS::NoValue
+  CloudFormationServiceAdminRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument: 
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - cloudformation.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Description: Allows CloudFormation to create and manage AWS stacks and resources on your behalf
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+      RoleName: !Sub '${AWS::StackName}-Role'

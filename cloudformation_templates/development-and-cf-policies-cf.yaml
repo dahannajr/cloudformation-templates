@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create Policies for Front End and Backend Development 
+Resources:
+  APIDevelopmentGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: ECSDevelopmentGroup
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser
+        - arn:aws:iam::aws:policy/AWSCodeCommitPowerUser
+  UIDevelopmentGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: UIDevelopmentGroup
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AWSCodeCommitPowerUser
+      Policies:
+        - PolicyName: PreventS3BucketDeletion
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Deny
+                Action:
+                  - 's3:DeleteBucket'
+                  - 's3:DeleteBucketWebsite'
+                  - 's3:DeleteObjectVersion'
+                Resource: '*'
+  CloudFormationPowerUserRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: A role to allow user's to push infrastructure changes
+      RoleName: CloudFormationPowerUserRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - cloudformation.amazonaws.com
+            Action: 
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/PowerUserAccess
+        - arn:aws:iam::aws:policy/AWSCodeCommitPowerUser
+      Policies:
+        - PolicyName: CloudFormationPowerUserIamPermissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - iam:*Role*
+                  - iam:*Policy*
+                  - iam:*Profile*
+                  - iam:*Group*
+                Resource: '*'
+  CloudFormationExecutionGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: CloudFormationExecutionGroup
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCloudFormationFullAccess
+        - arn:aws:iam::aws:policy/AWSCodeCommitPowerUser
+      Policies:
+        - PolicyName: CloudFormationRoleAssignment
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - iam:GetRole
+                  - iam:PassRole
+                Resource: !GetAtt CloudFormationPowerUserRole.Arn
+        

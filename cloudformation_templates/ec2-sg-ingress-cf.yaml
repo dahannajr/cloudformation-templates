@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: This template adds and Ingress Rule to a security Group
+Parameters:
+  CidrIp:
+    Type: String
+    Default: ''
+  ExportVariableName:
+    Description: Variable exported by the stack to containing the SG ID
+    Type: String
+  FromPort:
+    Type: Number
+    Default: 0
+  IpProtocol:
+    Type: String
+  SourceSecurityGroupId:
+    Type: String
+    Default: ''
+  SourceSecurityGroupStackName:
+    Type: String
+    Default: ''
+  SourceSecurityGroupStackExportVariableName:
+    Type: String
+    Default: ''
+  SourceSecurityGroupStackCIDRExportVariableName:
+    Type: String
+    Default: ''
+  StackName:
+    Description: Name of the stack used to create the Security Group
+    Type: String
+  ToPort:
+    Type: Number
+    Default: 0
+Conditions:
+  HasCidrIp: !Not 
+    - !Equals 
+      - !Ref CidrIp
+      - ''
+  HasFromPort: !Not
+    - !Equals 
+      - !Ref FromPort
+      - 0
+  HasSourceSecurityGroupId: !Not
+    - !Equals 
+      - !Ref SourceSecurityGroupId
+      - ''
+  HasSourceSecurityGroupStackNameCondition: !And
+    - !Not
+      - !Equals 
+        - !Ref SourceSecurityGroupStackName
+        - ''
+    - !Not
+      - !Equals 
+        - !Ref SourceSecurityGroupStackExportVariableName
+        - ''
+  HasSourceSecurityGroupStackNameForCIDRCondition: !And
+    - !Not
+      - !Equals 
+        - !Ref SourceSecurityGroupStackName
+        - ''
+    - !Not
+      - !Equals 
+        - !Ref SourceSecurityGroupStackCIDRExportVariableName
+        - ''
+  HasToPort: !Not
+  - !Equals 
+    - !Ref ToPort
+    - 0
+Resources:
+  EcsSecurityGroupIngressFromSelf:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Ingress from other containers in the same security group
+      GroupId: 
+        Fn::ImportValue: !Join [ "-", [ !Ref StackName, !Ref ExportVariableName]]
+      IpProtocol: !Ref IpProtocol
+      FromPort: !If
+        - HasFromPort
+        - !Ref FromPort
+        - !Ref AWS::NoValue
+      ToPort: !If 
+        - HasToPort
+        - !Ref ToPort
+        - !Ref AWS::NoValue
+      SourceSecurityGroupId: !If 
+        - HasSourceSecurityGroupId
+        - !Ref SourceSecurityGroupId
+        - !If
+          - HasSourceSecurityGroupStackNameCondition
+          - Fn::ImportValue: !Join [ "-", [ !Ref SourceSecurityGroupStackName, !Ref SourceSecurityGroupStackExportVariableName]]
+          - !Ref AWS::NoValue
+      CidrIp: !If 
+        - HasCidrIp
+        - !Ref CidrIp
+        - !If
+          - HasSourceSecurityGroupStackNameForCIDRCondition
+          - Fn::ImportValue: !Join [ "-", [ !Ref SourceSecurityGroupStackName, !Ref SourceSecurityGroupStackCIDRExportVariableName]]
+          - !Ref AWS::NoValue

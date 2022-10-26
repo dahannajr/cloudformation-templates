@@ -1,0 +1,25 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  Establish a SSM Command Run Document from piped in file
+Parameters:
+  CommandDocumentName:
+    Description: Name to give to the command document
+    Type: String
+  VersionName:
+    Description: An optional field specifying the version of the artifact you are creating with the document. 
+    Type: String
+Resources:
+  SSMCommandDocument:
+    Type: AWS::SSM::Document
+    Properties:
+      Content:
+%COMMAND_DOCUMENT_CONTENT%
+      DocumentType: Command
+      Name: !Ref CommandDocumentName
+      VersionName: !Ref VersionName
+Outputs:
+  SSMCommandDocument:
+    Description:  SSMCommandDocument Reference
+    Value: !Ref SSMCommandDocument
+    Export: 
+      Name: !Sub '${AWS::StackName}-SSMCommandDocument'

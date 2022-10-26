@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  Establish an EFS Access Point volume
+Parameters:
+  AccessPointPosixGroupId:
+    Description: POSIX identity group ID
+    Type: Number
+    Default: 1100
+  AccessPointPosixUserId:
+    Description: POSIX identity  user ID
+    Type: Number
+    Default: 1100
+  CreateRootDirectory:
+    Description: Create the root directory in the EFS file FileSystem
+    Type: String
+    Default: false
+    AllowedValues:
+      - false
+      - true
+  EFSStackName:
+    Description: Name of Stack that created the EFS FileSystem
+    Type: String
+  MountPath:
+    Description: Path with EFS to mount the access point
+    Type: String
+    Default: /
+Conditions:
+  CreateRootDirectoryCondition: !Equals
+    - !Ref CreateRootDirectory
+    - true
+Resources:
+  AccessPointResource:
+      Type: AWS::EFS::AccessPoint
+      Properties:
+        AccessPointTags:
+          - Key: Name
+            Value: !Sub '${AWS::StackName}-accesspoint'
+        FileSystemId:
+          Fn::ImportValue:
+            !Join [ "-", [ !Ref EFSStackName, "EFSFileSystem"]]
+        PosixUser:
+          Uid: !Ref AccessPointPosixUserId
+          Gid: !Ref AccessPointPosixGroupId
+        RootDirectory:
+          CreationInfo: !If
+            - CreateRootDirectoryCondition
+            - OwnerGid: !Ref AccessPointPosixGroupId
+              OwnerUid: !Ref AccessPointPosixUserId
+              Permissions: "0755"
+            - !Ref AWS::NoValue
+          Path: !Ref MountPath
+Outputs:
+  AccessPointResourceArn:
+    Value: !GetAtt AccessPointResource.Arn
+    Description: The Amazon Resource Name (ARN) of the access point.
+    Export:
+      Name: !Sub '${AWS::StackName}-AccessPointResourceArn'
+  AccessPointResourceId:
+    Value: !GetAtt AccessPointResource.AccessPointId
+    Description: The ID of the EFS access point.
+    Export:
+      Name: !Sub '${AWS::StackName}-AccessPointResourceId'
+  

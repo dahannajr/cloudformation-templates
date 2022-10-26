@@ -1,0 +1,15 @@
+---
+schemaVersion: 2.2
+description: Perform a Git pull for a scripted language, e.g. PHP
+parameters:
+  RootDirectory:
+    type: String
+    description: The root directory where the Git repo is currently checked out
+mainSteps:
+  - action: aws:runPowerShellScript
+    name: runPowerShellScript
+    inputs:
+      timeoutSeconds: '60'
+      workingDirectory: {{ RootDirectory }}
+      runCommand:
+      - "git pull"

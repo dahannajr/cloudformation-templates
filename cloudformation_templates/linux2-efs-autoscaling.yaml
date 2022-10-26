@@ -1,0 +1,644 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: Establish a PHP server in an Auto Scaling Group with EFS support
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: Amazon EFS Parameters
+      Parameters:
+        - InstanceType
+        - EC2KeyName
+        - EncrpytedBoolean
+        - Cmk
+        - SecurityGroup
+        - NumberOfSubnets
+        - Subnet
+    ParameterLabels:
+      EncrpytedBoolean:
+        default: Encryption state
+      Cmk:
+        default: KMS Key
+      InstanceType:
+        default: Instance Type
+      EC2KeyName:
+        default: Existing Key Pair
+      NumberOfSubnets:
+        default: Number of subnets
+      SecurityGroup:
+        default: EFS Security Group
+      Subnet:
+        default: Subnets
+Parameters:
+  ApplicationDirectory:
+    Description: Application installation directory
+    Type: String
+  AutoScalingDesiredCapacity:
+    Type: Number
+    Default: 1
+  AutoScalingMaxCapacity:
+    Type: Number
+    Default: 12
+  AutoScalingMinCapacity:
+    Type: Number
+    Default: 0
+  DomainName:
+    Type: String
+  EC2KeyName:
+    Description: Name of an existing EC2 key pair
+    Type: AWS::EC2::KeyPair::KeyName
+  EFSStackName:
+    Description: Name of the stack used to create the EFS volume.
+    Type: String
+  ELBStackName:
+    Description: Name of the ELB Stack to Associate this Auto Scaling setup to
+    Type: String
+    Default: ''
+  InstanceType:
+    AllowedValues:
+      - t2.nano
+      - t2.micro
+      - t2.small
+      - t2.medium
+      - t2.large
+      - t2.xlarge
+      - t2.2xlarge
+      - m3.medium
+      - m3.large
+      - m3.xlarge
+      - m3.2xlarge
+      - m4.large
+      - m4.xlarge
+      - m4.2xlarge
+      - m4.4xlarge
+      - m4.10xlarge
+      - m4.16xlarge
+      - m5.large
+      - m5.xlarge
+      - c3.large
+      - c3.xlarge
+      - c3.2xlarge
+      - c3.4xlarge
+      - c3.8xlarge
+      - c4.large
+      - c4.xlarge
+      - c4.2xlarge
+      - c4.4xlarge
+      - c4.8xlarge
+      - c5.large
+      - c5.xlarge
+      - c5.2xlarge
+      - c5.4xlarge
+      - c5.8xlarge
+      - r3.large
+      - r3.xlarge
+      - r3.2xlarge
+      - r3.4xlarge
+      - r3.8xlarge
+      - r4.large
+      - r4.xlarge
+      - r4.2xlarge
+      - r4.4xlarge
+      - r4.8xlarge
+      - r4.16xlarge
+      - i3.large
+      - i3.xlarge
+      - i3.2xlarge
+      - i3.4xlarge
+      - i3.8xlarge
+      - i3.16xlarge
+      - d2.xlarge
+      - d2.2xlarge
+      - d2.4xlarge
+      - d2.8xlarge
+      - p2.xlarge
+      - p2.8xlarage
+      - p2.16xlarge
+      - g3.4xlarge
+      - g3.8xlarge
+      - g3.16xlarge
+      - f1.2xlarge
+      - f1.16xlarge
+      - x1.16xlarge
+      - x1.32xlarge
+    ConstraintDescription: Must be a valid Amazon EC2 instance type.
+    Default: r4.large
+    Description: The Amazon EC2 instance type that adds data to the file system.
+    Type: String
+  ElasticCacheStackName:
+    Description: Name of the stack which built the ElasticCache Environment, if one is used.
+    Type: String
+    Default: ''
+  NumberOfSubnets:
+    AllowedValues:
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    Default: 3
+    Description: Number of subnets. This must match your selections in the list of Subnets below.
+    Type: String 
+  RDSHostName:
+    Description: Host name of the RDS endpoint.  Either this or the RDS Stack name should be supplied
+    Type: String
+    Default: ''
+  RDSStackName:
+    Description: Name of the stack used to create the RDS instance 
+    Type: String
+    Default: ''
+  SecurityGroup:
+    Description: Select the Amazon EFS security group.
+    Type: String  
+  SubnetIDsExporttName:
+    Description: Exported variables from the VPC creation stack.
+    Type: CommaDelimitedList
+  TagEnvironment:
+    Description: Dev, Test, or Production Resource
+    Type: String
+    AllowedValues:
+      - Dev
+      - Test
+      - Prod
+  TagInstancePurpose:
+    Description: Purpose of the compute instance
+    Type: String
+    AllowedValues:
+      - WebApplication
+      - Database
+  TemplateAMI:
+    Type: String
+    Description: AMI to associate with the Launch Template
+  VPCStackName:
+    Description: Name of the stack used to create the VPC environment.  Will be used for ImportValue calls.
+    Type: String
+  WebAppUser:
+    Type: String
+    Description: User the web server runs as
+  WebAppUserUID:
+    Type: String
+    Description: User ID for the user created to run the web app server
+Conditions:
+  HasELBCondition: !Not
+    - !Equals
+      - !Ref ELBStackName
+      - ''
+  NumberOfSubnets1:
+      !Equals [ 1, !Ref NumberOfSubnets ]
+  NumberOfSubnets2:
+      !Equals [ 2, !Ref NumberOfSubnets ]
+  NumberOfSubnets3:
+      !Equals [ 3, !Ref NumberOfSubnets ]
+  NumberOfSubnets4:
+      !Equals [ 4, !Ref NumberOfSubnets ]
+  NumberOfSubnets5:
+      !Equals [ 5, !Ref NumberOfSubnets ]
+  NumberOfSubnets6:
+      !Equals [ 6, !Ref NumberOfSubnets ]
+  Subnet0: !Or
+    - !Condition NumberOfSubnets1
+    - !Condition NumberOfSubnets2
+    - !Condition NumberOfSubnets3
+    - !Condition NumberOfSubnets4
+    - !Condition NumberOfSubnets5
+    - !Condition NumberOfSubnets6
+  Subnet1: !Or
+    - !Condition NumberOfSubnets2
+    - !Condition NumberOfSubnets3
+    - !Condition NumberOfSubnets4
+    - !Condition NumberOfSubnets5
+    - !Condition NumberOfSubnets6
+  Subnet2: !Or
+    - !Condition NumberOfSubnets3
+    - !Condition NumberOfSubnets4
+    - !Condition NumberOfSubnets5
+    - !Condition NumberOfSubnets6
+  Subnet3: !Or
+    - !Condition NumberOfSubnets4
+    - !Condition NumberOfSubnets5
+    - !Condition NumberOfSubnets6
+  Subnet4: !Or
+    - !Condition NumberOfSubnets5
+    - !Condition NumberOfSubnets6
+  Subnet5: !Condition NumberOfSubnets6  
+  UseDefaultSecurityGroupCondition:
+    !Equals ['', !Ref SecurityGroup]
+  UseRDSStackNameCondition: !Not
+    - !Equals
+      - !Ref RDSStackName
+      - ''
+  UseElasticCacheCondition: !Not 
+    - !Equals [!Ref ElasticCacheStackName, ''] 
+Mappings:
+  RegionMap:
+    ap-northeast-1:
+      AMI: ami-
+    ap-northeast-2:
+      AMI: ami-
+    ap-south-1:
+      AMI: ami-
+    ap-southeast-1:
+      AMI: ami-
+    ap-southeast-2:
+      AMI: ami-
+    ca-central-1:
+      AMI: ami-
+    eu-central-1:
+      AMI: ami-
+    eu-west-1:
+      AMI: ami-03b934bf41e65b1c0
+    eu-west-2:
+      AMI: ami-
+    sa-east-1:
+      AMI: ami-
+    us-east-1:
+      AMI: ami-04502ab603220aa32
+    us-east-2:
+      AMI: ami-
+    us-west-1:
+      AMI: ami-
+    us-west-2:
+      AMI: ami-
+Resources:
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+      - !Ref InstanceRole
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+      - PolicyName: efs-create-file-system-with-storage
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+                - autoscaling:DescribeAutoScalingGroups
+                - autoscaling:DescribeAutoScalingInstances
+                - autoscaling:DescribePolicies
+                - autoscaling:UpdateAutoScalingGroup
+              Resource: '*'
+      - PolicyName: codecommit-access
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+                - codecommit:GitPull
+                - codecommit:GitPush
+              Resource: !Sub 'arn:aws:codecommit:*:${AWS::AccountId}:*'
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      Cooldown: 60
+      HealthCheckGracePeriod: 120
+      HealthCheckType: EC2
+      LaunchTemplate:
+        LaunchTemplateId: !Ref SectorProfileAppLaunchTemplate
+        Version: !GetAtt SectorProfileAppLaunchTemplate.LatestVersionNumber
+      MaxSize: !Ref AutoScalingMaxCapacity
+      MinSize: !Ref AutoScalingMinCapacity
+      DesiredCapacity: !Ref AutoScalingDesiredCapacity
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-AppServer-EFSBacked"
+          PropagateAtLaunch: true
+      VPCZoneIdentifier:
+        !If
+          [ NumberOfSubnets1,
+          [ Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 0, !Ref SubnetIDsExporttName ]]] ],
+          !If
+            [ NumberOfSubnets2,
+            [ Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 0, !Ref SubnetIDsExporttName ]]], Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 1, !Ref SubnetIDsExporttName ]]] ],
+            !If
+              [ NumberOfSubnets3,
+              [ Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 0, !Ref SubnetIDsExporttName ]]], Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 1, !Ref SubnetIDsExporttName ]]], Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 2, !Ref SubnetIDsExporttName ]]] ],
+              !If
+                [ NumberOfSubnets4,
+                [ Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 0, !Ref SubnetIDsExporttName ]]], Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 1, !Ref SubnetIDsExporttName ]]], Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 2, !Ref SubnetIDsExporttName ]]], Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 3, !Ref SubnetIDsExporttName ]]] ],
+                !If
+                  [ NumberOfSubnets5,
+                  [ Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 0, !Ref SubnetIDsExporttName ]]], Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 1, !Ref SubnetIDsExporttName ]]], Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 2, !Ref SubnetIDsExporttName ]]], Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 3, !Ref SubnetIDsExporttName ]]], Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 4, !Ref SubnetIDsExporttName ]]] ],
+                  [ Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 0, !Ref SubnetIDsExporttName ]]], Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 1, !Ref SubnetIDsExporttName ]]], Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 2, !Ref SubnetIDsExporttName ]]], Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 3, !Ref SubnetIDsExporttName ]]], Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 4, !Ref SubnetIDsExporttName ]]], Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Select [ 5, !Ref SubnetIDsExporttName ]]] ]
+                  ]
+                ]
+              ]
+            ]
+          ]
+      TargetGroupARNs:
+        - !If 
+          - HasELBCondition
+          - Fn::ImportValue: !Join [ "-", [ !Ref ELBStackName, "TargetGroupARN"]]
+          - !Ref AWS::NoValue
+    CreationPolicy:
+      ResourceSignal:
+        Count: 0
+        Timeout: PT12H
+    UpdatePolicy:
+      AutoScalingReplacingUpdate:
+        WillReplace: true
+  AutoScalingPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      Cooldown: 60
+      PolicyType: SimpleScaling
+      ScalingAdjustment: 1
+  SectorProfileAppLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        DisableApiTermination: false
+        IamInstanceProfile: 
+          Arn: !GetAtt InstanceProfile.Arn
+        ImageId: !Ref TemplateAMI
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref EC2KeyName
+        Monitoring:
+           Enabled: true
+        SecurityGroupIds:
+        - !If [ UseDefaultSecurityGroupCondition,  Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, "DefaultSG"]],  !Ref SecurityGroup ]
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Environment
+                Value: !Ref TagEnvironment
+              - Key: Purpose
+                Value: !Ref TagInstancePurpose
+        UserData:
+          Fn::Base64: !Sub
+            - |
+              #cloud-config
+              package_update: true
+              package_upgrade: true
+              write_files:
+                - content: |
+                    [PHP]
+                    output_buffering = 4096
+                    engine = On
+                    short_open_tag = Off
+                    precision = 14
+                    zlib.output_compression = Off
+                    implicit_flush = Off
+                    unserialize_callback_func =
+                    serialize_precision = -1
+                    disable_functions =
+                    disable_classes =
+                    zend.enable_gc = On
+                    expose_php = Off
+                    max_execution_time = 30
+                    max_input_time = 60
+                    memory_limit = 2048M
+                    error_reporting =  E_ALL & ~E_NOTICE & ~E_WARNING & ~E_STRICT & ~E_DEPRECATED
+                    display_errors = Off
+                    display_startup_errors = Off
+                    log_errors = On
+                    log_errors_max_len = 1024
+                    ignore_repeated_errors = Off
+                    ignore_repeated_source = Off
+                    report_memleaks = On
+                    html_errors = On
+                    variables_order = "GPCS"
+                    request_order = "GP"
+                    register_argc_argv = Off
+                    auto_globals_jit = On
+                    post_max_size = 8M
+                    auto_prepend_file =
+                    auto_append_file =
+                    default_mimetype = "text/html"
+                    default_charset = "UTF-8"
+                    doc_root =
+                    user_dir =
+                    enable_dl = Off
+                    cgi.fix_pathinfo = 0
+                    file_uploads = On
+                    upload_max_filesize = 10M
+                    max_file_uploads = 20
+                    allow_url_fopen = On
+                    allow_url_include = Off
+                    default_socket_timeout = 60
+                    max_input_vars = 3000
+                    suhosin.get.max_vars = 3000
+                    suhosin.post.max_vars = 3000
+                    suhosin.request.max_vars = 3000
+                    [CLI Server]
+                    cli_server.color = On
+                    [Date]
+                    [filter]
+                    [iconv]
+                    [intl]
+                    [sqlite3]
+                    [Pcre]
+                    pcre.jit=0
+                    [Pdo]
+                    [Pdo_mysql]
+                    pdo_mysql.cache_size = 2000
+                    pdo_mysql.default_socket =
+                    [Phar]
+                    [mail function]
+                    sendmail_path = /usr/sbin/sendmail -t -i
+                    mail.add_x_header = On
+                    [ODBC]
+                    odbc.allow_persistent = On
+                    odbc.check_persistent = On
+                    odbc.max_persistent = -1
+                    odbc.max_links = -1
+                    odbc.defaultlrl = 4096
+                    odbc.defaultbinmode = 1
+                    [Interbase]
+                    ibase.allow_persistent = 1
+                    ibase.max_persistent = -1
+                    ibase.max_links = -1
+                    ibase.timestampformat = "%Y-%m-%d %H:%M:%S"
+                    ibase.dateformat = "%Y-%m-%d"
+                    ibase.timeformat = "%H:%M:%S"
+                    [MySQLi]
+                    [mysqlnd]
+                    mysqlnd.collect_statistics = On
+                    mysqlnd.collect_memory_statistics = Off
+                    [PostgreSQL]
+                    pgsql.allow_persistent = On
+                    pgsql.auto_reset_persistent = Off
+                    pgsql.max_persistent = -1
+                    pgsql.max_links = -1
+                    pgsql.ignore_notice = 0
+                    pgsql.log_notice = 0
+                    [bcmath]
+                    bcmath.scale = 0
+                    [browscap]
+                    [Session]
+                    session.save_handler = memcached
+                    session.save_path = "scriptco-prod-ec-memcached-prod-vpc-eccachecluster.oiewir.cfg.use1.cache.amazonaws.com:11211"
+                    session.lazy_write = Off
+                    session.use_strict_mode = 1
+                    session.use_cookies = 1
+                    session.use_only_cookies = 1
+                    session.name = PHPSESSID
+                    session.auto_start = 0
+                    session.cookie_lifetime = 0
+                    session.cookie_path = /
+                    session.cookie_domain =
+                    session.cookie_httponly =
+                    session.serialize_handler = php
+                    session.gc_probability = 1
+                    session.gc_divisor = 1000
+                    session.gc_maxlifetime = 1440
+                    session.referer_check =
+                    session.cache_limiter = nocache
+                    session.cache_expire = 180
+                    session.use_trans_sid = 0
+                    session.sid_length = 26
+                    session.trans_sid_tags = "a=href,area=href,frame=src,form="
+                    session.sid_bits_per_character = 5
+                    [Assertion]
+                    zend.assertions = -1
+                    [mbstring]
+                    [gd]
+                    [exif]
+                    [Tidy]
+                    tidy.clean_output = Off
+                    [soap]
+                    soap.wsdl_cache_enabled = 1
+                    soap.wsdl_cache_dir = "/tmp"
+                    soap.wsdl_cache_ttl = 86400
+                    soap.wsdl_cache_limit = 5
+                    [sysvshm]
+                    ldap.max_links = -1
+                    [ldap]
+                    ldap.max_links = -1
+                    [dba]
+                    [curl]
+                    [openssl]
+                  owner: root:root
+                  path: /etc/php.ini
+                  permissions: '0644'
+                - content: |
+                    server {
+                      listen 80;
+                      server_name ${DomainName};
+                      root   /var/www/html/wp-scriptco-com;
+                      index index.php index.html index.htm;
+                      access_log /var/log/nginx/${DomainName}_access.log;
+                      error_log /var/log/nginx/${DomainName}_error.log;
+
+                      include /var/www/html/wp-scriptco-com/nginx.conf;
+
+                      location / {
+                        try_files $uri $uri/ /index.php?$args;
+                      }
+
+                      location ~ \.php$ {
+                        include fastcgi_params;
+                        fastcgi_pass unix:/var/run/php-fpm/${DomainName}.sock;
+                        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+
+                        if ($fastcgi_script_name = "/asowzakgtj-hc.php") { access_log off; }
+                      }
+
+                      location ~ ^/status$ {
+                        allow 127.0.0.1/32;
+                        deny all;
+                        access_log off;
+                        include fastcgi_params;
+                        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                        fastcgi_pass unix:/var/run/php-fpm/${DomainName}.sock;
+                      }
+
+                      # Plugin Handles This
+                      location = /favicon.ico { access_log off; log_not_found off; allow all; }
+                      # Plugin Handles This
+                      location = /robots.txt { access_log off; log_not_found off; allow all; }
+                      #    Prevent access to any files starting with a dot, like .htaccess or text editor temp files
+                    }
+                  owner: root:root
+                  path: /etc/nginx/conf.d/${DomainName}.conf
+                  permissions: '0644'
+                - content: |
+                    [www]
+                    user = ${WebAppUser}
+                    group = ${WebAppUser}
+                    listen = /var/run/php-fpm/${DomainName}.sock
+                    listen.owner = ${WebAppUser}
+                    listen.group = ${WebAppUser}
+                    listen.mode = 0660
+                    pm = static
+                    pm.max_children = 100
+                    pm.max_requests = 30
+                    pm.status_path = /status
+                    slowlog = /var/log/php-fpm/${DomainName}-slow.log
+                    php_admin_value[error_log] = /var/log/php-fpm/${DomainName}-error.log
+                    php_admin_flag[log_errors] = on
+                    php_admin_value[error_reporting] = E_ALL & ~E_NOTICE & ~E_WARNING & ~E_STRICT & ~E_DEPRECATED
+                    php_admin_flag[fastcgi.logging] = off
+                  owner: root:root
+                  path: /etc/php-fpm.d/${DomainName}.conf
+                  permissions: '0644'
+              runcmd:
+                - yum update -y
+                - efs_mount_point_1=/mnt/efs/fs1
+                - mkdir -p "${!efs_mount_point_1}"
+                - mount -t efs -o fsc ${FileSystemId}:/ ${!efs_mount_point_1}
+                - adduser ${WebAppUser} -u ${WebAppUserUID} -U --no-create-home -s /sbin/nologin
+                - chown ${WebAppUser}:${WebAppUser} /var/www/html
+                - chown -R ${WebAppUser}:${WebAppUser} /var/lib/nginx
+                - mkdir -p /var/lib/php/${DomainName}/session
+                - mkdir -p /var/lib/php/${DomainName}/wsdlcache
+                - mkdir -p /var/lib/php/${DomainName}/opcache
+                - test ! -d "/var/cache/nginx/fastcgi_temp/cache" && mkdir -p /var/cache/nginx/fastcgi_temp/cache
+                - chown -R ${WebAppUser}:${WebAppUser} /var/lib/php/${DomainName}
+                - chmod -R 777 /var/cache/nginx/fastcgi_temp/cache
+                - ln -s ${!efs_mount_point_1} /var/www/html
+                - sed -i 's/user nginx/user\ ${WebAppUser}/g' /etc/nginx/nginx.conf 
+                - rm -rf /var/lib/php/${DomainName}/session/*
+                - rm -rf /var/lib/php/${DomainName}/wsdlcache/*
+                - rm -rf /var/lib/php/${DomainName}/opcache/*
+                - rm -rf /var/log/nginx/*
+                - rm -rf /var/log/php-fpm/*
+                - rm -rf  /etc/php-fpm.d/www.conf
+                - service cachefilesd start
+                - service php-fpm restart
+                - service nginx restart
+                - chkconfig cachefilesd on
+                - chkconfig nginx on
+                - chkconfig php-fpm on
+                - git config --global credential.helper '!aws codecommit credential-helper $@'
+                - git config --global credential.UseHttpPath true
+            - RDS_HOSTNAME: !If
+                - UseRDSStackNameCondition
+                - Fn::ImportValue: !Join [ "-", [ !Ref RDSStackName, 'AuroraClusterFullEndpoint']] 
+                - !Ref RDSHostName 
+              DomainName: !Ref DomainName
+              FileSystemId: 
+                Fn::ImportValue: !Join [ "-", [ !Ref EFSStackName, "EFSFileSystem"]]
+              HealthCheckPath: 
+                Fn::ImportValue: !Join [ "-", [ !Ref ELBStackName, 'HealthCheckPath']] 
+      LaunchTemplateName: !Sub '${AWS::StackName}-SectorProfileAppLaunchTemplate'
+Outputs:
+  AutoScalingGroup:
+    Value: !Ref AutoScalingGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-AutoScalingGroup'
+  WebAppUser:
+    Value: !Ref WebAppUser
+    Export:
+      Name: !Sub '${AWS::StackName}-WebAppUser'
+  WebAppUserUID:
+    Value: !Ref WebAppUserUID
+    Export:
+      Name: !Sub '${AWS::StackName}-WebAppUserUID'

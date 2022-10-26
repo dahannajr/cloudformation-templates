@@ -1,0 +1,37 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: This template creates an EC2 Security Group 
+Parameters:
+  AllowIngressFromSelf:
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+  VPCStackName:
+    Description: Name of the stack used to create the VPC
+    Type: String
+Conditions:
+  AllowIngressFromSelfCondition: !Equals 
+    - !Ref AllowIngressFromSelf
+    - true
+Resources:
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: !Sub '${AWS::StackName} Security Group'
+        VpcId:
+          Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, "VPCID"]]
+  SecurityGroupIngressFromSelf:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: AllowIngressFromSelfCondition
+    Properties:
+      Description: Allow ingress from self
+      GroupId: !Ref SecurityGroup
+      IpProtocol: '-1'
+      SourceSecurityGroupId: !Ref SecurityGroup
+Outputs:
+  SecurityGroupId:
+    Description: Security Group ID
+    Value: !GetAtt SecurityGroup.GroupId
+    Export:
+      Name: !Sub '${AWS::StackName}-SecurityGroupId'

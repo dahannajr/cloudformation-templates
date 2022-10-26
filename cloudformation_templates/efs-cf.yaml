@@ -1,0 +1,202 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  Establish an EFS volume
+Parameters:
+  AccessPointPosixGroupId:
+    Description: POSIX identity group ID
+    Type: Number
+    Default: 1100
+  AccessPointPosixUserId:
+    Description: POSIX identity  user ID
+    Type: Number
+    Default: 1100
+  BackupPolicy:
+    Description: Use the BackupPolicy to turn automatic backups on or off for the file system.
+    Type: String
+    Default: ENABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+  Encrypted:
+    Description: A Boolean value that, if true, creates an encrypted file system. 
+    Type: String
+    Default: 'false'
+    AllowedValues: 
+      - 'true'
+      - 'false'
+  CreateAccessPoint:
+    Description: Create Access Point for EFS Volume
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+  CreateCMK:
+    Description: If Encrypted is true, and CreateCMK, this will create a new CMK and associate it with the EFS drive
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+  LifecyclePolicy:
+    Description: A list of policies used by EFS lifecycle management to transition files to the Infrequent Access (IA) storage class.
+    Type: String
+    Default: ''
+    AllowedValues:
+      - ''
+      - AFTER_14_DAYS
+      - AFTER_30_DAYS
+      - AFTER_60_DAYS
+      - AFTER_7_DAYS
+      - AFTER_90_DAYS
+  PerformanceMode:
+    Description: The performance mode of the file system
+    Type: String
+    Default: generalPurpose
+    AllowedValues:
+      - generalPurpose
+      - maxIO
+  ThroughputMode:
+    Description: The throughput mode for the file system to be created.
+    Type: String
+    Default: bursting
+    AllowedValues:
+      - bursting
+      - provisioned
+  ProvisionedThroughputInMibps:
+    Description: The throughput, measured in MiB/s, that you want to provision for a file system that you're creating. Valid values are 1-1024.
+    Type: Number
+    Default: 1
+    MinValue: 1
+    MaxValue: 1024
+Conditions:
+  CreateAccessPointCondition: !Equals
+    - !Ref CreateAccessPoint
+    - 'true'
+  CreateCMKCondition: !And
+    - !Equals 
+      - !Ref Encrypted
+      - 'true'
+    - !Equals 
+      - !Ref CreateCMK
+      - 'true'
+  IsEncryptedCondition: !Equals 
+    - !Ref Encrypted
+    - 'true'
+  IncludeLifecyclePolicyCondition: !Not 
+    - !Equals 
+      - !Ref LifecyclePolicy
+      - ''
+  IsProvisionedThroughputCondition: !Equals
+    - !Ref ThroughputMode
+    - provisioned
+Resources:
+  EFSFileSystem:
+    Type: "AWS::EFS::FileSystem"
+    Properties:
+      BackupPolicy: 
+        Status: !Ref BackupPolicy
+      Encrypted:  !Ref Encrypted
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-efs'
+      KmsKeyId: !If
+        - CreateCMKCondition
+        - !Ref EFSCMKKey
+        - !Ref AWS::NoValue
+      LifecyclePolicies: !If
+        - IncludeLifecyclePolicyCondition
+        - TransitionToIA: !Ref LifecyclePolicy
+        - !Ref AWS::NoValue
+      PerformanceMode: !Ref PerformanceMode
+      ProvisionedThroughputInMibps: !If 
+        - IsProvisionedThroughputCondition
+        - !Ref ProvisionedThroughputInMibps
+        - !Ref AWS::NoValue
+      ThroughputMode: !Ref ThroughputMode
+  EFSCMKKey:
+    Type: "AWS::KMS::Key"
+    Condition: CreateCMKCondition
+    Properties:
+      Description: Customer managed key for use with EFS
+      EnableKeyRotation: 'true'
+      Enabled: 'true'
+      KeyPolicy:  
+        Version: 2012-10-17
+        Id: !Sub 'kms-efs-$!{AWS::StackName}'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: 
+                - !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action:
+              - 'kms:*'
+            Resource: '*'
+  EncryptionKeyAlias:
+    Type: AWS::KMS::Alias
+    Condition: CreateCMKCondition
+    Properties:
+      AliasName: !Sub "alias/${AWS::StackName}"
+      TargetKeyId: !Ref EFSCMKKey
+  AccessPointResource:
+      Type: AWS::EFS::AccessPoint
+      Condition: CreateAccessPointCondition
+      Properties:
+        AccessPointTags:
+          - Key: Name
+            Value: !Sub '${AWS::StackName}-accesspoint'
+        FileSystemId: !Ref EFSFileSystem
+        PosixUser:
+          Uid: !Ref AccessPointPosixUserId
+          Gid: !Ref AccessPointPosixGroupId
+        RootDirectory:
+          CreationInfo:
+            OwnerGid: !Ref AccessPointPosixGroupId
+            OwnerUid: !Ref AccessPointPosixUserId
+            Permissions: "0755"
+          Path: "/"
+Outputs:
+  AccessPointResourceArn:
+    Condition: CreateAccessPointCondition
+    Value: !GetAtt AccessPointResource.Arn
+    Description: The Amazon Resource Name (ARN) of the access point.
+    Export:
+      Name: !Sub '${AWS::StackName}-AccessPointResourceArn'
+  AccessPointResourceId:
+    Condition: CreateAccessPointCondition
+    Value: !GetAtt AccessPointResource.AccessPointId
+    Description: The ID of the EFS access point.
+    Export:
+      Name: !Sub '${AWS::StackName}-AccessPointResourceId'
+  EFSFileSystem:
+    Value: !Ref EFSFileSystem
+    Export:
+      Name: !Sub '${AWS::StackName}-EFSFileSystem'
+  EFSFileSystemDnsName:
+    Description: DNS name for the Amazon EFS file system.
+    Value: !Join [ '.', [ !Ref EFSFileSystem, 'efs', !Ref 'AWS::Region', 'amazonaws', 'com' ] ]
+    Export:
+      Name: !Sub '${AWS::StackName}-EFSFileSystemDnsName'
+  EFSFileSystemMountCommand:
+    Description: Mount command for mounting the Amazon EFS file system.
+    Value: !Join [ '', [ 'sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 ', !Join [ '.', [ !Ref EFSFileSystem, 'efs', !Ref 'AWS::Region', 'amazonaws', 'com:/', '/', !Ref EFSFileSystem ] ] ] ]
+    Export:
+      Name: !Sub '${AWS::StackName}-EFSFileSystemMountCommand'
+  EFSCMKKeyAlias:
+    Condition: CreateCMKCondition
+    Description: "The alias of the KMS encryption key used for storage"
+    Value: !Ref EncryptionKeyAlias
+    Export:
+      Name: !Sub '${AWS::StackName}-EncryptionKeyAlias'
+  EFSCMKKeyId:
+    Condition: CreateCMKCondition
+    Description: When you pass the logical ID of this resource to the intrinsic Ref function, Ref returns the key ID
+    Value: !Ref EFSCMKKey
+    Export:
+      Name: !Sub '${AWS::StackName}-EFSCMKKeyId'
+  EFSCMKKeyArn:
+    Condition: CreateCMKCondition
+    Description: The Amazon Resource Name (ARN) of the AWS KMS customer master key (CMK)
+    Value: !GetAtt  EFSCMKKey.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-EFSCMKKeyArn'

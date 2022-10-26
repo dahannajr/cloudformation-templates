@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Add entry to VPC Route Tablee for linkage to Via ID
+Parameters:
+  VPCStackName:
+    Type: String
+    Description: Stack name which created the Route Table we'll be adding an entry to
+  RouteTableExportName:
+    Type: String
+    Description: Exported output which will point to the Route Table ID
+  RouteEndpointStackName:
+    Type: String
+  RouteEndpointExportName:
+    Type: String
+  RouteDestinationType:
+    Type: String
+    Description: Type of Route Point to use
+    AllowedValues:
+      - transit
+      - nat
+      - vpcpeer
+  RouteCIDR:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(0|1[6-9]|2[0-8]))$|^$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/0,16-28
+    Description: CIDR route to point to Transit Gateway
+    Type: String
+  VPCRouteToStackName:
+    Type: String
+    Description: Stack which created the VPC to route to
+    Default: ''
+Conditions:
+  IsRouteDestinationTransitGatewayCondition: !Equals
+    - !Ref 'RouteDestinationType'
+    - 'transit'
+  IsRouteDestinationNATCondition: !Equals
+    - !Ref 'RouteDestinationType'
+    - 'nat'
+  IsRouteDestinationVPCPeerCondition: !Equals
+    - !Ref 'RouteDestinationType'
+    - 'vpcpeer'
+  RouteToCIDRCondition: !Not
+    - !Equals
+      - !Ref 'RouteCIDR'
+      - ''
+Resources:
+  Route:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: 
+        Fn::ImportValue: !Join [ "-", [ !Ref VPCStackName, !Ref RouteTableExportName] ]
+      DestinationCidrBlock: !If
+        - RouteToCIDRCondition
+        - !Ref RouteCIDR
+        - Fn::ImportValue: !Join [ "-", [ !Ref VPCRouteToStackName, 'VPCCIDR'] ]
+      NatGatewayId: !If 
+        - IsRouteDestinationNATCondition
+        - Fn::ImportValue: !Join [ "-", [ !Ref RouteEndpointStackName, !Ref RouteEndpointExportName] ]
+        - !Ref AWS::NoValue
+      TransitGatewayId: !If 
+        - IsRouteDestinationTransitGatewayCondition
+        - Fn::ImportValue: !Join [ "-", [ !Ref RouteEndpointStackName, !Ref RouteEndpointExportName] ]
+        - !Ref AWS::NoValue
+      VpcPeeringConnectionId: !If
+        - IsRouteDestinationVPCPeerCondition
+        - Fn::ImportValue: !Join [ "-", [ !Ref RouteEndpointStackName, !Ref RouteEndpointExportName] ]
+        - !Ref AWS::NoValue

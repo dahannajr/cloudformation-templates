@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  Setup an S3 bucket
+Parameters:
+  AccessControl:
+    Description: A canned access control list (ACL) that grants predefined permissions to the bucket.
+    Type: String
+    Default: Private
+    AllowedValues:
+      - Private
+      - PublicRead
+      - PublicReadWrite
+      - AwsExecRead
+      - AuthenticatedRead
+      - BucketOwnerRead
+      - BucketOwnerFullControl
+      - LogDeliveryWrite
+  EncryptionKey:
+    Description: ARN of key to use for encryption
+    Type: String
+    Default: ''
+Conditions:
+  EncryptBucketCondition: !Not
+    - !Equals 
+      - !Ref EncryptionKey
+      - ''
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      AccessControl: !Ref AccessControl
+      BucketEncryption: !If 
+        - EncryptBucketCondition
+        - ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              KMSMasterKeyID: !If 
+                - EncryptBucketCondition
+                - !Ref AWS::NoValue
+                - !Ref AWS::NoValue
+              SSEAlgorithm: aws:kms
+        - !Ref AWS::NoValue
+      BucketName: !Sub '${AWS::StackName}-${AWS::Region}-${AWS::AccountId}'
+Outputs:
+  BucketName:
+    Value: !Ref S3Bucket
+    Description: Name of the Amazon S3 bucket
+    Export:
+      Name: !Sub '${AWS::StackName}-BucketName'
+  BucketArn:
+    Value: !GetAtt S3Bucket.Arn
+    Description: ARN of the S3 bucket
+    Export:
+      Name: !Sub '${AWS::StackName}-BucketArn'
+  BucketWebsiteUrl:
+    Value: !GetAtt S3Bucket.WebsiteURL
+    Description: WebsiteURL of the S3 bucket
+    Export:
+      Name: !Sub '${AWS::StackName}-BucketWebsiteUrl'

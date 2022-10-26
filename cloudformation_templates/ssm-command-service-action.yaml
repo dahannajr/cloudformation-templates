@@ -1,0 +1,31 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Perform an action on a Linux service
+Resources:
+  SSMCommandDocument:
+    Type: AWS::SSM::Document
+    Properties:
+      Content: 
+        schemaVersion: '2.2'
+        description: Perform an action on a Linux service
+        parameters:
+          ServerName:
+            type: String
+            description: Name of the Linux service to reload
+          ServiceAction:
+            type: String
+            description: Action to perform on the service call
+        mainSteps:
+          - action: aws:runShellScript
+            name: runShellScript
+            inputs:
+              timeoutSeconds: '60'
+              runCommand:
+              - "service {{ ServerName }} {{ ServiceAction }}"
+      DocumentType: Command
+      Name: 'LinuxServiceActionDocument'
+Outputs:
+  SSMCommandDocument:
+    Description:  SSMCommandDocument Reference
+    Value: !Ref SSMCommandDocument
+    Export: 
+      Name: !Sub '${AWS::StackName}-SSMCommandDocument'

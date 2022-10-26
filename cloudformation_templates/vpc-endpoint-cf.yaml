@@ -1,0 +1,178 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  Establish a VPC Endpoint to an AWS Service
+Parameters:
+  PrivateDnsEnabled:
+    Description: Indicate whether to associate a private hosted zone with the specified VPC.
+    Type: String
+    Default: false
+    AllowedValues:
+      - false
+      - true
+  SecurityGroupStacks:
+    Description: Comma seperated list of stacks that created security groups to associate with this endpoint
+    Type: CommaDelimitedList
+    Default: ''
+  SecurityGroupStackCount:
+    Description: Number of Security Group Stacks supplied
+    Type: Number
+    Default: 0
+    MinValue: 0
+    MaxValue: 5
+  SecurityGroupStackExportVariable:
+    Description: Comma seperated list of exported outputs to import into the VPCE security group association
+    Type: CommaDelimitedList
+    Default: ''
+  ServiceName:
+    Description: The service name.
+    Type: String
+  StackSubnetIdCount:
+    Description: Number of Stack Subnet IDs which will be imported
+    Type: Number
+    Default: 0
+  StackSubnetIds:
+    Description: Comma delimited list of Stack Subnet ID variables to import
+    Type: CommaDelimitedList
+    Default: ""
+  VpcEndpointType:
+    Description: The type of endpoint.
+    Type: String
+    Default: Gateway
+    AllowedValues:
+      - Gateway
+      - GatewayLoadBalancer
+      - Interface
+  VPCStackName:
+    Description: The value used for the name tag of the bastion host
+    Type: String
+Conditions:
+  CreateRouteTableEntriesCondition: !Equals
+    - !Ref VpcEndpointType
+    - "Gateway"
+  Has1OrMoreStackSubnetIdsCondition: !Not
+    - !Equals
+      - !Ref StackSubnetIdCount
+      - 0
+  Has2OrMoreStackSubnetIdsCondition: !And
+    - !Not
+      - !Equals
+        - !Ref StackSubnetIdCount
+        - 0
+    - !Not
+      - !Equals
+        - !Ref StackSubnetIdCount
+        - 1
+  Has3OrMoreStackSubnetIdsCondition: !And
+    - !Not
+      - !Equals
+        - !Ref StackSubnetIdCount
+        - 0
+    - !Not
+      - !Equals
+        - !Ref StackSubnetIdCount
+        - 1
+    - !Not
+      - !Equals
+        - !Ref StackSubnetIdCount
+        - 2
+  Has1OrMoreSecurityGroupStackCondition: !Not
+    - !Equals
+      - !Ref SecurityGroupStackCount
+      - 0
+  Has2OrMoreSecurityGroupStackCondition: !And
+    - !Not
+      - !Equals
+        - !Ref SecurityGroupStackCount
+        - 0
+    - !Not
+      - !Equals
+        - !Ref SecurityGroupStackCount
+        - 1
+  Has3OrMoreSecurityGroupStackCondition: !And
+    - !Condition Has2OrMoreSecurityGroupStackCondition
+    - !Not
+      - !Equals
+        - !Ref SecurityGroupStackCount
+        - 2
+  Has4OrMoreSecurityGroupStackCondition: !And
+    - !Condition Has3OrMoreSecurityGroupStackCondition
+    - !Not
+      - !Equals
+        - !Ref SecurityGroupStackCount
+        - 3
+  Has5OrMoreSecurityGroupStackCondition: !And
+    - !Condition Has4OrMoreSecurityGroupStackCondition
+    - !Not
+      - !Equals
+        - !Ref SecurityGroupStackCount
+        - 4
+  IsInterfaceType: !Equals
+    - !Ref VpcEndpointType
+    - Interface
+Resources:
+  VPCEndPoint:
+    Type: "AWS::EC2::VPCEndpoint"
+    Properties:
+      PrivateDnsEnabled: !If
+        - IsInterfaceType
+        - !Ref PrivateDnsEnabled
+        - !Ref AWS::NoValue
+      RouteTableIds: !If
+        - CreateRouteTableEntriesCondition
+        - - Fn::ImportValue:
+              !Join ["-", [!Ref VPCStackName, "PrivateSubnet1ARouteTable"]]
+          - Fn::ImportValue:
+              !Join ["-", [!Ref VPCStackName, "PrivateSubnet1BRouteTable"]]
+          - Fn::ImportValue:
+              !Join ["-", [!Ref VPCStackName, "PrivateSubnet2ARouteTable"]]
+          - Fn::ImportValue:
+              !Join ["-", [!Ref VPCStackName, "PrivateSubnet2BRouteTable"]]
+        - !Ref AWS::NoValue
+      SecurityGroupIds: !If
+        - IsInterfaceType
+        - - !If
+            - Has1OrMoreSecurityGroupStackCondition
+            - Fn::ImportValue: !Join ["-", [ !Select [0, !Ref SecurityGroupStacks], !Select [0, !Ref SecurityGroupStackExportVariable]]]
+            - !Ref AWS::NoValue
+          - !If
+            - Has2OrMoreSecurityGroupStackCondition
+            - Fn::ImportValue: !Join ["-", [ !Select [1, !Ref SecurityGroupStacks], !Select [1, !Ref SecurityGroupStackExportVariable]]]
+            - !Ref AWS::NoValue
+          - !If
+            - Has3OrMoreSecurityGroupStackCondition
+            - Fn::ImportValue: !Join ["-", [ !Select [2, !Ref SecurityGroupStacks], !Select [2, !Ref SecurityGroupStackExportVariable]]]
+            - !Ref AWS::NoValue
+          - !If
+            - Has4OrMoreSecurityGroupStackCondition
+            - Fn::ImportValue: !Join ["-", [ !Select [3, !Ref SecurityGroupStacks], !Select [3, !Ref SecurityGroupStackExportVariable]]]
+            - !Ref AWS::NoValue
+          - !If
+            - Has5OrMoreSecurityGroupStackCondition
+            - Fn::ImportValue: !Join ["-", [ !Select [4, !Ref SecurityGroupStacks], !Select [4, !Ref SecurityGroupStackExportVariable]]]
+            - !Ref AWS::NoValue
+        - !Ref AWS::NoValue
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.${ServiceName}"
+      SubnetIds:
+        - !If
+          - Has1OrMoreStackSubnetIdsCondition
+          - Fn::ImportValue:
+              !Join ["-", [!Ref VPCStackName, !Select [0, !Ref StackSubnetIds]]]
+          - !Ref AWS::NoValue
+        - !If
+          - Has2OrMoreStackSubnetIdsCondition
+          - Fn::ImportValue:
+              !Join ["-", [!Ref VPCStackName, !Select [1, !Ref StackSubnetIds]]]
+          - !Ref AWS::NoValue
+        - !If
+          - Has3OrMoreStackSubnetIdsCondition
+          - Fn::ImportValue:
+              !Join ["-", [!Ref VPCStackName, !Select [2, !Ref StackSubnetIds]]]
+          - !Ref AWS::NoValue
+      VpcEndpointType: !Ref VpcEndpointType
+      VpcId:
+        Fn::ImportValue: !Join ["-", [!Ref VPCStackName, "VPCID"]]
+Outputs:
+  VPCEndPointId:
+    Value: !Ref VPCEndPoint
+    Export:
+      Name: !Sub "${AWS::StackName}-VPCEndPoint"

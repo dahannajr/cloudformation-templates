@@ -1,0 +1,42 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: An example CloudFormation template for SSL Certificate Generation.
+Parameters:
+  DomainName:
+    Type: String
+  SubjectAlternativeNames:
+    Type: String
+    Default: ''
+  Route53StackName:
+    Type: String
+    Default: ''
+Conditions:
+  HasSubjectAlternativeNamesCondition:
+    !Not [ !Equals [ !Ref SubjectAlternativeNames, '' ] ]
+  HasRoute53DomainCreationStack: !Not 
+    - !Equals 
+      - !Ref Route53StackName
+      - ''
+Resources:
+  SSLCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref DomainName
+      SubjectAlternativeNames: 
+        !If 
+          - HasSubjectAlternativeNamesCondition
+          - !Split [',', !Ref SubjectAlternativeNames ]
+          - !Ref AWS::NoValue
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - !If 
+          - HasRoute53DomainCreationStack
+          - DomainName: !Ref DomainName
+            HostedZoneId:
+              Fn::ImportValue: !Join [ "-", [ !Ref Route53StackName, Route53ZoneId]]
+          - !Ref AWS::NoValue
+Outputs:
+  CertificateArn:
+    Description: Certificate ARN
+    Value: !Ref SSLCertificate
+    Export:
+      Name: !Sub '${AWS::StackName}-CertificateArn'

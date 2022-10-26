@@ -1,0 +1,135 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Attach VPC subnets to transit gateway and establish appropriate Transit Gateway Routes
+Parameters:
+  VPCStackName:
+    Type: String
+    Description: Name of the stack to associate to the Transit Gateway
+  TransitGatewayStackName:
+    Type: String
+    Default: ''
+  TransitGatewayRouteTableId:
+    Type: String
+    Default: ''
+  TransitGatewayId:
+    Type: String
+    Default: ''
+  Subnet1ID:
+    Type: String
+    Default: ''
+  Subnet2ID:
+    Type: String
+    Default: ''
+  Subnet3ID:
+    Type: String
+    Default: ''
+  Subnet4ID:
+    Type: String
+    Default: ''
+  AddPublicRouteForTransitGateway:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'false'
+      - 'true'
+Conditions:
+  Subnet1Condition: !Not
+    - !Equals
+      - !Ref Subnet1ID
+      - ''
+  Subnet2Condition: !Not
+    - !Equals
+      - !Ref Subnet2ID
+      - ''
+  Subnet3Condition: !Not
+    - !Equals
+      - !Ref Subnet3ID
+      - ''
+  Subnet4Condition: !Not
+    - !Equals
+      - !Ref Subnet4ID
+      - ''
+  AddPublicRouteForTransitGatewayCondition: !Equals 
+    - !Ref AddPublicRouteForTransitGateway
+    - 'true'
+  AddAssociationCondition: !Equals 
+    - 'false'
+    - 'true'
+  UseTransitGatewayStackNameCondition: !Not 
+    - !Equals 
+      - !Ref TransitGatewayStackName
+      - ''
+  NotUseTransitGatewayStackNameCondition: !Equals 
+    - !Ref TransitGatewayStackName
+    - ''
+Resources:
+  TransitGatewayAttachment:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties: 
+      SubnetIds: 
+        - !If [Subnet1Condition, Fn::ImportValue: !Join ['-', [!Ref VPCStackName, !Ref Subnet1ID]], Ref: AWS::NoValue]
+        - !If [Subnet2Condition, Fn::ImportValue: !Join ['-', [!Ref VPCStackName, !Ref Subnet2ID]], Ref: AWS::NoValue]
+        - !If [Subnet3Condition, Fn::ImportValue: !Join ['-', [!Ref VPCStackName, !Ref Subnet3ID]], Ref: AWS::NoValue]
+        - !If [Subnet4Condition, Fn::ImportValue: !Join ['-', [!Ref VPCStackName, !Ref Subnet4ID]], Ref: AWS::NoValue]
+      Tags: 
+      - Key: Application
+        Value: !Ref 'AWS::StackId'
+      TransitGatewayId: !If 
+        - UseTransitGatewayStackNameCondition
+        - Fn::ImportValue:
+            !Join ['-', [!Ref TransitGatewayStackName, "TransitGatewayId"]]
+        - !Ref TransitGatewayId
+      VpcId: 
+        Fn::ImportValue:
+          !Join ['-', [!Ref VPCStackName, "VPCID"]]
+  TransitGatewayRouteTableAssociation:
+    Type: AWS::EC2::TransitGatewayRouteTableAssociation
+    Properties: 
+      TransitGatewayAttachmentId: !Ref TransitGatewayAttachment
+      TransitGatewayRouteTableId: !If 
+        - UseTransitGatewayStackNameCondition
+        - Fn::ImportValue:
+            !Join ['-', [!Ref TransitGatewayStackName, "TransitGatewayRouteTableId"]]
+        - !Ref TransitGatewayRouteTableId
+  TransitGatewayRouteTablePropagation:
+    Type: AWS::EC2::TransitGatewayRouteTablePropagation
+    Condition: AddAssociationCondition
+    Properties: 
+      TransitGatewayAttachmentId: !Ref TransitGatewayAttachment
+      TransitGatewayRouteTableId: !If 
+        - UseTransitGatewayStackNameCondition
+        - Fn::ImportValue:
+            !Join ['-', [!Ref TransitGatewayStackName, "TransitGatewayRouteTableId"]]
+        - !Ref TransitGatewayRouteTableId
+  TransitGatewayRoute:
+    Type: AWS::EC2::TransitGatewayRoute
+    Properties: 
+      Blackhole: false
+      DestinationCidrBlock: 
+        Fn::ImportValue: !Join ['-', [!Ref VPCStackName, "VPCCIDR"]]
+      TransitGatewayAttachmentId: !Ref TransitGatewayAttachment
+      TransitGatewayRouteTableId: !If 
+        - UseTransitGatewayStackNameCondition
+        - Fn::ImportValue:
+            !Join ['-', [!Ref TransitGatewayStackName, "TransitGatewayRouteTableId"]]
+        - !Ref TransitGatewayRouteTableId
+  PublicTransitGatewayRoute:
+    Type: AWS::EC2::TransitGatewayRoute
+    Condition: AddPublicRouteForTransitGatewayCondition
+    Properties: 
+      Blackhole: false
+      DestinationCidrBlock: 0.0.0.0/0
+      TransitGatewayAttachmentId: !Ref TransitGatewayAttachment
+      TransitGatewayRouteTableId: !If 
+        - UseTransitGatewayStackNameCondition
+        - Fn::ImportValue:
+            !Join ['-', [!Ref TransitGatewayStackName, "TransitGatewayRouteTableId"]]
+        - !Ref TransitGatewayRouteTableId
+Outputs:
+  TransitGatewayAttachmentId:
+    Value: !Ref TransitGatewayAttachment
+    Export:
+      Name: !Sub '${AWS::StackName}-TransitGatewayAttachmentId'
+  TransitGatewayRouteId:
+    Value: !Ref TransitGatewayRoute
+    Export:
+      Name: !Sub '${AWS::StackName}-TransitGatewayRouteId'

@@ -1,0 +1,157 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Establish a Guard Duty Detector for the account
+Parameters:
+  MajorEngineVersion:
+    Type: String
+    Default: "15.00"
+  OptionGroupDescription:
+    Type: String
+    Default: General SQL Express Option Group
+  S3BackupBucketStack:
+    Type: String
+    Default: ''
+  S3BackupBucketName:
+    Type: String
+    Default: ''
+Conditions:
+  HasS3BackupBucketStack: !Not
+    - !Equals
+      - !Ref S3BackupBucketStack
+      - ''
+  HasS3BackupBucketName: !Not
+    - !Equals
+      - !Ref S3BackupBucketName
+      - ''
+  HasSQLBackupRestoreRoleCondition: !Or
+    - !Condition HasS3BackupBucketStack
+    - !Condition HasS3BackupBucketName
+Mappings:
+  RegionARNPrefix:
+    us-east-1:
+      ARNPrefix: 'arn:aws:'
+    us-west-1:
+      ARNPrefix: 'arn:aws:'
+    us-west-2:
+      ARNPrefix: 'arn:aws:'
+    eu-west-1:
+      ARNPrefix: 'arn:aws:'
+    ap-northeast-1:
+      ARNPrefix: 'arn:aws:'
+    ap-northeast-2:
+      ARNPrefix: 'arn:aws:'
+    ap-southeast-1:
+      ARNPrefix: 'arn:aws:'
+    ap-southeast-2:
+      ARNPrefix: 'arn:aws:'
+    ap-south-1:
+      ARNPrefix: 'arn:aws:'
+    us-east-2:
+      ARNPrefix: 'arn:aws:'
+    sa-east-1:
+      ARNPrefix: 'arn:aws:'
+    cn-north-1:
+      ARNPrefix: 'arn:aws-cn:'
+    eu-central-1:
+      ARNPrefix: 'arn:aws:'
+  RegionELBAccountId:
+    us-east-1:
+      AccountId: '127311923021'
+    us-west-1:
+      AccountId: '027434742980'
+    us-west-2:
+      AccountId: '797873946194'
+    eu-west-1:
+      AccountId: '156460612806'
+    ap-northeast-1:
+      AccountId: '582318560864'
+    ap-northeast-2:
+      AccountId: '600734575887'
+    ap-southeast-1:
+      AccountId: '114774131450'
+    ap-southeast-2:
+      AccountId: '783225319266'
+    ap-south-1:
+      AccountId: '718504428378'
+    us-east-2:
+      AccountId: '033677994240'
+    sa-east-1:
+      AccountId: '507241528517'
+    cn-north-1:
+      AccountId: '638102146993'
+    eu-central-1:
+      AccountId: '054676820928'
+Resources:
+  RDSOptionGroup: 
+    Type: "AWS::RDS::OptionGroup"
+    Properties: 
+      EngineName: sqlserver-ex
+      MajorEngineVersion: !Ref MajorEngineVersion
+      OptionConfigurations:
+      - !If 
+        - HasSQLBackupRestoreRoleCondition
+        - OptionName: SQLSERVER_BACKUP_RESTORE
+          OptionSettings:
+            - Name: IAM_ROLE_ARN
+              Value: !GetAtt SQLBackupRestoreRole.Arn
+        - !Ref AWS::NoValue
+      OptionGroupDescription: !Ref OptionGroupDescription
+  SQLBackupRestoreRole:
+    Type: AWS::IAM::Role
+    Condition: HasSQLBackupRestoreRoleCondition
+    Properties:
+      RoleName: 
+        !Join ['-', [!Ref 'AWS::StackName', SQLBackupRestoreRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: rds.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: !Join ['-', [!Ref 'AWS::StackName', SQLBackupRestorePolicy]]
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                Resource: !If 
+                  - HasS3BackupBucketName
+                  - !Join 
+                    - ''
+                    - - !FindInMap 
+                        - RegionARNPrefix
+                        - !Ref 'AWS::Region'
+                        - ARNPrefix
+                      - 's3:::'
+                      - !Ref 'S3BackupBucketName'
+                  - Fn::ImportValue: !Join [ "-", [!Ref S3BackupBucketStack, "BucketArn"]]
+              - Effect: Allow
+                Action:
+                  - s3:GetObjectMetaData
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListMultipartUploadParts
+                  - s3:AbortMultipartUpload
+                Resource: !If 
+                  - HasS3BackupBucketName
+                  - !Join 
+                    - ''
+                    - - !FindInMap 
+                        - RegionARNPrefix
+                        - !Ref 'AWS::Region'
+                        - ARNPrefix
+                      - 's3:::'
+                      - !Ref 'S3BackupBucketName'
+                      - /*
+                  - !Join
+                    - ''
+                    - - Fn::ImportValue: !Join [ "-", [!Ref S3BackupBucketStack, "BucketArn"]]
+                      - /*
+Outputs:
+  RDSOptionGroupName:
+    Description: Option Group Name
+    Value: !Ref RDSOptionGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-RDSOptionGroupName'

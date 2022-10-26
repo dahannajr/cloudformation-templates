@@ -1,0 +1,68 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  RepositoryName:
+    Description: Name of the CodeCommit repository
+    Type: String
+  RepositoryDescription:
+    Description: Description of the CodeCommit repository
+    Type: String
+Resources:
+  CodeCommitRepo:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: !Ref RepositoryName
+      RepositoryDescription: !Ref RepositoryDescription
+  RepoPullGroup:
+    Type: AWS::IAM::Group
+    Properties: 
+      GroupName: !Sub '${RepositoryName}-repo-pull'
+      Path: /
+      Policies: 
+        - PolicyName: !Sub '${RepositoryName}-repo-pull-policy'
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codecommit:GitPull
+                  - codecommit:Get*
+                Resource: !GetAtt ["CodeCommitRepo", "Arn"]
+  RepoUpdateGroup:
+    Type: AWS::IAM::Group
+    Properties: 
+      GroupName: !Sub '${RepositoryName}-repo-update'
+      Path: /
+      Policies: 
+        - PolicyName: !Sub '${RepositoryName}-repo-pull-policy'
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codecommit:*
+                Resource: !GetAtt ["CodeCommitRepo", "Arn"]
+              - Effect: Deny
+                Action:
+                  - codecommit:DeleteRepository
+                Resource: !GetAtt ["CodeCommitRepo", "Arn"]
+Outputs:
+  RepositoryId:
+    Value: !Ref CodeCommitRepo
+    Export:
+      Name: !Sub '${AWS::StackName}-RepositoryId'
+  RepositoryArn:
+    Value: !GetAtt ["CodeCommitRepo", "Arn"]
+    Export:
+      Name: !Sub '${AWS::StackName}-RepositoryArn'
+  CloneUrlHttp:
+    Value: !GetAtt ["CodeCommitRepo", "CloneUrlHttp"]
+    Export:
+      Name: !Sub '${AWS::StackName}-CloneUrlHttp'
+  CloneUrlSsh:
+    Value: !GetAtt ["CodeCommitRepo", "CloneUrlSsh"]
+    Export:
+      Name: !Sub '${AWS::StackName}-CloneUrlSsh'
+  RepositoryName:
+    Value: !GetAtt ["CodeCommitRepo", "Name"]
+    Export:
+      Name: !Sub '${AWS::StackName}-RepositoryName'

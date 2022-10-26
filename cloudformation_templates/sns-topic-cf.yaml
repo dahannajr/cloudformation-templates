@@ -1,0 +1,37 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 
+  CloudFormation Template to setup a defeault SNS Topic
+# Metadata: 
+
+Parameters: 
+  DisplayName:
+    Description: The display name to use for an Amazon SNS topic with SMS subscriptions. 
+    Type: String
+    Default: ''
+
+# Mappings: 
+
+Conditions: 
+  HasDisplayName: !Not 
+    - !Equals 
+      - !Ref DisplayName
+      - ''
+
+Resources: 
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !If [HasDisplayName, !Ref DisplayName, !Join [ '-', [!Ref AWS::StackName, 'topic']]]
+      TopicName: !Join [ '-', [!Ref AWS::StackName, 'topic']]
+
+Outputs:
+  TopicName:
+    Description: Returns the name of an Amazon SNS topic.
+    Value: !GetAtt SNSTopic.TopicName
+    Export: 
+      Name: !Join ['-', [!Ref AWS::StackName, 'TopicName']]
+  TopicArn:
+    Description: Returns the SNS Topic ARN
+    Value: !Ref SNSTopic
+    Export: 
+      Name: !Join ['-', [!Ref AWS::StackName, 'TopicArn']]
