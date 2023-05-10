@@ -18,9 +18,16 @@ Parameters:
     Type: String
   userpoolClientRefreshTokenValidity:
     Type: String
+  UserPoolDomainValue:
+    Type: String
+    Default: ''
   usernameAttributes:
     Type: String
 Conditions:
+  IncludeUserPoolDomain: !Not 
+    - !Equals 
+      - !Ref UserPoolDomainValue
+      - ''
   ShouldNotCreateEnvResources:
     Fn::Equals:
       - Ref: env
@@ -68,6 +75,12 @@ Resources:
         - ''
         - - !Ref AWS::StackName
           - 'UserPool'
+  UserPoolDomain: 
+    Type: AWS::Cognito::UserPoolDomain 
+    Condition: IncludeUserPoolDomain
+    Properties:
+      UserPoolId: !Ref UserPool 
+      Domain: !Ref UserPoolDomainValue
   UserPoolClientWeb:
     Type: AWS::Cognito::UserPoolClient
     Properties:
@@ -78,8 +91,6 @@ Resources:
         Ref: userpoolClientRefreshTokenValidity
       TokenValidityUnits:
         RefreshToken: days
-    DependsOn:
-      - UserPool
   UserPoolClient:
     Type: AWS::Cognito::UserPoolClient
     Properties:
@@ -92,8 +103,6 @@ Resources:
         Ref: userpoolClientRefreshTokenValidity
       TokenValidityUnits:
         RefreshToken: days
-    DependsOn:
-      - UserPool
   UserPoolClientRole:
     Type: AWS::IAM::Role
     Properties:
@@ -148,8 +157,6 @@ Resources:
       Handler: index.handler
       Runtime: nodejs14.x
       Timeout: 300
-    DependsOn:
-      - UserPoolClientRole
   UserPoolClientLambdaPolicy:
     Type: AWS::IAM::Policy
     Properties:
@@ -280,12 +287,6 @@ Resources:
         - ''
         - - !Ref AWS::StackName
           - 'UnauthRole'
-  CognitoIdpSLR:
-    Type: 'AWS::IAM::ServiceLinkedRole'
-    Properties:
-      AWSServiceName: email.cognito-idp.amazonaws.com
-      Description: Test SLR description
-      CustomSuffix: TestSuffix
 Outputs:
   IdentityPoolId:
     Description: Id for the identity pool

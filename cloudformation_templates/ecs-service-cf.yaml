@@ -14,9 +14,9 @@ Parameters:
     Type: CommaDelimitedList
     Default: ""
   Container1ContainerDependencyList:
-    Type: List<Number>
+    Type: String
     Description: 1-based index into other conatiners which this container requires
-    Default: 0
+    Default: ''
   Container1ContainerDependencyListCount:
     Type: Number
     Description: Number of elements in Container1ContainerDependencyList
@@ -65,7 +65,7 @@ Parameters:
     Default: 0
   Container2ContainerDependencyListCount:
     Type: Number
-    Description: Number of elements in Container1ContainerDependencyList
+    Description: Number of elements in Container2ContainerDependencyList
     Default: 0
     MinValue: 0
     MaxValue: 3
@@ -281,20 +281,32 @@ Parameters:
     Type: String
     Description: Container Path, Source Volume, Read ReadOnly
     Default: ""
+  Container1WithImageCommand:
+    Type: List<String>
+    Default: ""
+  Container2WithImageCommand:
+    Type: List<String>
+    Default: ""
   ContainersHaveMemoryReservations:
     Type: String
-    Default: false
+    Default: "false"
     AllowedValues:
-      - true
-      - false
+      - "true"
+      - "false"
   DesiredCountOfService:
     Type: Number
     Default: 1
+  ECRImageARNs:
+    Description: Comma separated list of ECR repos containing images to be used in the Task Definitions
+    Type: CommaDelimitedList
+    Default: ""
   ECRStacks:
     Description: Comma separated list of stacks containing ECS repositories
     Type: CommaDelimitedList
     Default: ""
   ECRTaskContainerPorts:
+    Type: List<Number>
+  ECRTaskFromImageContainerPorts:
     Type: List<Number>
   ECRTaskCpu:
     Description: The number of cpu units used by the task.
@@ -303,6 +315,10 @@ Parameters:
   ECRTaskMemory:
     Description: The amount (in MiB) of memory used by the task.
     Type: String
+    Default: ""
+  ECRImageTags:
+    Description: Comma separated list of tags to associate with the image ARNs
+    Type: CommaDelimitedList
     Default: ""
   ECRTaskTags:
     Description: Comma separated list of tags to associate with the tasks
@@ -318,38 +334,38 @@ Parameters:
   EnableDynamicPorts:
     Description: Enable dynamic ports with Bridge networking mode
     Type: String
-    Default: true
+    Default: "true"
     AllowedValues:
-      - true
-      - false
+      - "true"
+      - "false"
   EnableFirelens:
     Description: Enable log streaming through Kinesis Firehose
     Type: String
-    Default: false
+    Default: "false"
     AllowedValues:
-      - true
-      - false
+      - "true"
+      - "false"
   EnableFluentd:
     Description: Enable log streaming through Fluentd
     Type: String
-    Default: false
+    Default: "false"
     AllowedValues:
-      - true
-      - false
+      - "true"
+      - "false"
   EnableHttp2Routing:
     Description:  Indicates whether HTTP/2 is enabled. The possible values are true and false.
     Type: String
-    Default: true
+    Default: "true"
     AllowedValues:
-      - true
-      - false
+      - "true"
+      - "false"
   EnableLoadBalancerLogging:
     Description: Enable logging of ALB access logs to S3
     Type: String
-    Default: false
+    Default: "false"
     AllowedValues:
-      - true
-      - false
+      - "true"
+      - "false"
   EphemeralStorageSizeInGB:
     Description: Size of the ephemeral stroage to be associated with the Task Definition
     Type: Number
@@ -371,6 +387,16 @@ Parameters:
     AllowedValues:
       - FARGATE
       - EC2
+  LoadBalancerStickinessType:
+    Type: String
+    Default: ''
+    AllowedValues:
+      - lb_cookie
+      - app_cookie
+      - source_ip
+      - source_ip_dest_ip
+      - source_ip_dest_ip_proto
+      - ''
   MatcherHttpCode:
     Description: Specifies the HTTP codes that healthy targets must use when responding to an HTTP health check.
     Type: String
@@ -395,6 +421,10 @@ Parameters:
       - host
       - none
   NumberOfContainers:
+    Type: Number
+    MinValue: 0
+    MaxValue: 10
+  NumberOfContainersFromExistingImages:
     Type: Number
     MinValue: 0
     MaxValue: 10
@@ -486,7 +516,9 @@ Parameters:
 Conditions:
   Container1ContainerHasCommand: !Not
     - !Equals
-      - !Join ["", !Ref Container1ContainerCommand]
+      - !Join 
+        - ""
+        - !Ref Container1ContainerCommand
       - ""
   Container1Has1OrMoreContainerDependencies: !Not
     - !Equals
@@ -830,6 +862,26 @@ Conditions:
       - !Equals
         - !Select [9, !Ref ECRTaskContainerPorts]
         - 0
+  Container1ExistingImageHasExposedPorts: !And
+    - !Condition HasAtLeast1TargetContainersConditionUsingExistingECRImage
+    - !Not
+      - !Equals
+        - !Select [0, !Ref ECRTaskFromImageContainerPorts]
+        - 0
+  Container2ExistingImageHasExposedPorts: !And
+    - !Condition HasAtLeast1TargetContainersConditionUsingExistingECRImage
+    - !Not
+      - !Equals
+        - !Select [1, !Ref ECRTaskFromImageContainerPorts]
+        - 0
+  Container1WithImageHasCommand: !Not
+    - !Equals
+      - !Join ["", !Ref Container1WithImageCommand]
+      - ""
+  Container2WithImageHasCommand: !Not
+    - !Equals
+      - !Join ["", !Ref Container2WithImageCommand]
+      - ""
   CreateLoadBalancerCondition: !Or
     - !Not
       - !Equals
@@ -935,6 +987,10 @@ Conditions:
   EnableLoadBalancerLoggingCondition: !Equals
     - !Ref EnableLoadBalancerLogging
     - true
+  EnableLoadBalancerSessionStickiness: !Not 
+    - !Equals 
+      - !Ref LoadBalancerStickinessType
+      - ''
   HasCertificateCondition: !Not
     - !Equals
       - !Ref CertificateStackName
@@ -1040,6 +1096,43 @@ Conditions:
       - !Equals
         - !Ref NumberOfContainers
         - 9
+  HasAtLeast1TargetContainersConditionUsingExistingECRImage: !Or
+    - !Equals
+      - !Ref NumberOfContainersFromExistingImages
+      - 1
+    - !Equals
+      - !Ref NumberOfContainersFromExistingImages
+      - 2
+    - !Equals
+      - !Ref NumberOfContainersFromExistingImages
+      - 3
+    - !Equals
+      - !Ref NumberOfContainersFromExistingImages
+      - 4
+    - !Equals
+      - !Ref NumberOfContainersFromExistingImages
+      - 5
+    - !Equals
+      - !Ref NumberOfContainersFromExistingImages
+      - 6
+    - !Equals
+      - !Ref NumberOfContainersFromExistingImages
+      - 7
+    - !Equals
+      - !Ref NumberOfContainersFromExistingImages
+      - 8
+    - !Equals
+      - !Ref NumberOfContainersFromExistingImages
+      - 9
+    - !Equals
+      - !Ref NumberOfContainersFromExistingImages
+      - 10
+  HasAtLeast2TargetContainersConditionUsingExistingECRImage: !And
+    - !Condition HasAtLeast1TargetContainersConditionUsingExistingECRImage
+    - !Not
+      - !Equals
+        - !Ref NumberOfContainersFromExistingImages
+        - 1
   HasAtLeast1VolumeBind: !Or
     - !Equals
       - !Ref VolumesBindCount
@@ -1265,7 +1358,7 @@ Mappings:
 Resources:
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
-    Condition: HasAtLeast1TargetContainersCondition
+    Condition: HasAtLeast1TargetContainersConditionUsingExistingECRImage
     Properties:
       # Name of the task definition. Subsequent versions of the task definition are grouped together under this name.
       Family: !Join ["-", [!Ref ServiceName, TaskDefinition1]]
@@ -1427,23 +1520,57 @@ Resources:
                     - !Ref AWS::NoValue
                     - !Select [1, !Ref ECRTaskContainerPorts]
               - !Ref AWS::NoValue
-            Links:
-              - !If
-                - Container2Has1OrMoreContainerDependencies
-                - !Join
-                  - ":"
-                  - - Fn::ImportValue: !Join
-                        - "-"
-                        - - !Select
-                            - !Select [
-                                0,
-                                !Ref Container2ContainerDependencyList,
-                              ]
-                            - !Ref ECRStacks
-                          - "ECRName"
-                    - !Select [0, !Ref Container2ContainerDependencyLinkNames]
-                - !Ref AWS::NoValue
+            # Links:
+            #   - !If
+            #     - Container2Has1OrMoreContainerDependencies
+            #     - !Join
+            #       - ":"
+            #       - - Fn::ImportValue: !Join
+            #             - "-"
+            #             - - !Select
+            #                 - !Select [
+            #                     0,
+            #                     !Ref Container2ContainerDependencyList,
+            #                   ]
+            #                 - !Ref ECRStacks
+            #               - "ECRName"
+            #         - !Select [0, !Ref Container2ContainerDependencyLinkNames]
+            #     - !Ref AWS::NoValue
             # Send logs to CloudWatch Logs
+            # DependsOn:
+            #   - !If
+            #     - Container2Has1OrMoreContainerDependencies
+            #     - Condition: START
+            #       ContainerName:
+            #         Fn::ImportValue: !Join
+            #           - "-"
+            #           - - !Select
+            #               - !Select [0, !Ref Container2ContainerDependencyList]
+            #               - !Ref ECRStacks
+            #             - "ECRName"
+            #     - !Ref AWS::NoValue
+            #   - !If
+            #     - Container2Has2OrMoreContainerDependencies
+            #     - Condition: START
+            #       ContainerName:
+            #         Fn::ImportValue: !Join
+            #           - "-"
+            #           - - !Select
+            #               - !Select [1, !Ref Container2ContainerDependencyList]
+            #               - !Ref ECRStacks
+            #             - "ECRName"
+            #     - !Ref AWS::NoValue
+            #   - !If
+            #     - Container2Has3OrMoreContainerDependencies
+            #     - Condition: START
+            #       ContainerName:
+            #         Fn::ImportValue: !Join
+            #           - "-"
+            #           - - !Select
+            #               - !Select [2, !Ref Container2ContainerDependencyList]
+            #               - !Ref ECRStacks
+            #             - "ECRName"
+            #     - !Ref AWS::NoValue
             MemoryReservation: !If
               - ContainersHaveMemoryReservationsCondition
               - !Select [1, !Ref MemoryReservations]
@@ -1521,34 +1648,56 @@ Resources:
                     - !Ref AWS::NoValue
                     - !Select [2, !Ref ECRTaskContainerPorts]
               - !Ref AWS::NoValue
-            Links:
-              - !If
-                - Container3Has1OrMoreContainerDependencies
-                - !Join
-                  - ":"
-                  - - Fn::ImportValue: !Join
-                        - "-"
-                        - - !Select
-                            - !Select [
-                                0,
-                                !Ref Container3ContainerDependencyList,
-                              ]
-                            - !Ref ECRStacks
-                          - "ECRName"
-                    - !Select [0, !Ref Container3ContainerDependencyLinkNames]
-                - !Ref AWS::NoValue
-            DependsOn:
-              - !If
-                - Container3Has1OrMoreContainerDependencies
-                - Condition: START
-                  ContainerName:
-                    Fn::ImportValue: !Join
-                      - "-"
-                      - - !Select
-                          - !Select [0, !Ref Container3ContainerDependencyList]
-                          - !Ref ECRStacks
-                        - "ECRName"
-                - !Ref AWS::NoValue
+            # Links:
+            #   - !If
+            #     - Container3Has1OrMoreContainerDependencies
+            #     - !Join
+            #       - ":"
+            #       - - Fn::ImportValue: !Join
+            #             - "-"
+            #             - - !Select
+            #                 - !Select [
+            #                     0,
+            #                     !Ref Container3ContainerDependencyList,
+            #                   ]
+            #                 - !Ref ECRStacks
+            #               - "ECRName"
+            #         - !Select [0, !Ref Container3ContainerDependencyLinkNames]
+            #     - !Ref AWS::NoValue
+            # DependsOn:
+            #   - !If
+            #     - Container3Has1OrMoreContainerDependencies
+            #     - Condition: START
+            #       ContainerName:
+            #         Fn::ImportValue: !Join
+            #           - "-"
+            #           - - !Select
+            #               - !Select [0, !Ref Container3ContainerDependencyList]
+            #               - !Ref ECRStacks
+            #             - "ECRName"
+            #     - !Ref AWS::NoValue
+            #   - !If
+            #     - Container3Has2OrMoreContainerDependencies
+            #     - Condition: START
+            #       ContainerName:
+            #         Fn::ImportValue: !Join
+            #           - "-"
+            #           - - !Select
+            #               - !Select [1, !Ref Container3ContainerDependencyList]
+            #               - !Ref ECRStacks
+            #             - "ECRName"
+            #     - !Ref AWS::NoValue
+            #   - !If
+            #     - Container3Has3OrMoreContainerDependencies
+            #     - Condition: START
+            #       ContainerName:
+            #         Fn::ImportValue: !Join
+            #           - "-"
+            #           - - !Select
+            #               - !Select [2, !Ref Container3ContainerDependencyList]
+            #               - !Ref ECRStacks
+            #             - "ECRName"
+            #     - !Ref AWS::NoValue
             MemoryReservation: !If
               - ContainersHaveMemoryReservationsCondition
               - !Select [2, !Ref MemoryReservations]
@@ -1633,22 +1782,22 @@ Resources:
                     - !Ref AWS::NoValue
                     - !Select [3, !Ref ECRTaskContainerPorts]
               - !Ref AWS::NoValue
-            Links:
-              - !If
-                - Container4Has1OrMoreContainerDependencies
-                - !Join
-                  - ":"
-                  - - Fn::ImportValue: !Join
-                        - "-"
-                        - - !Select
-                            - !Select [
-                                0,
-                                !Ref Container4ContainerDependencyList,
-                              ]
-                            - !Ref ECRStacks
-                          - "ECRName"
-                    - !Select [0, !Ref Container4ContainerDependencyLinkNames]
-                - !Ref AWS::NoValue
+            # Links:
+            #   - !If
+            #     - Container4Has1OrMoreContainerDependencies
+            #     - !Join
+            #       - ":"
+            #       - - Fn::ImportValue: !Join
+            #             - "-"
+            #             - - !Select
+            #                 - !Select [
+            #                     0,
+            #                     !Ref Container4ContainerDependencyList,
+            #                   ]
+            #                 - !Ref ECRStacks
+            #               - "ECRName"
+            #         - !Select [0, !Ref Container4ContainerDependencyLinkNames]
+            #     - !Ref AWS::NoValue
             DependsOn:
               - !If
                 - Container4Has1OrMoreContainerDependencies
@@ -1745,22 +1894,22 @@ Resources:
                     - !Ref AWS::NoValue
                     - !Select [4, !Ref ECRTaskContainerPorts]
               - !Ref AWS::NoValue
-            Links:
-              - !If
-                - Container5Has1OrMoreContainerDependencies
-                - !Join
-                  - ":"
-                  - - Fn::ImportValue: !Join
-                        - "-"
-                        - - !Select
-                            - !Select [
-                                0,
-                                !Ref Container5ContainerDependencyList,
-                              ]
-                            - !Ref ECRStacks
-                          - "ECRName"
-                    - !Select [0, !Ref Container5ContainerDependencyLinkNames]
-                - !Ref AWS::NoValue
+            # Links:
+            #   - !If
+            #     - Container5Has1OrMoreContainerDependencies
+            #     - !Join
+            #       - ":"
+            #       - - Fn::ImportValue: !Join
+            #             - "-"
+            #             - - !Select
+            #                 - !Select [
+            #                     0,
+            #                     !Ref Container5ContainerDependencyList,
+            #                   ]
+            #                 - !Ref ECRStacks
+            #               - "ECRName"
+            #         - !Select [0, !Ref Container5ContainerDependencyLinkNames]
+            #     - !Ref AWS::NoValue
             DependsOn:
               - !If
                 - Container5Has1OrMoreContainerDependencies
@@ -1848,22 +1997,22 @@ Resources:
                     - !Ref AWS::NoValue
                     - !Select [5, !Ref ECRTaskContainerPorts]
               - !Ref AWS::NoValue
-            Links:
-              - !If
-                - Container6Has1OrMoreContainerDependencies
-                - !Join
-                  - ":"
-                  - - Fn::ImportValue: !Join
-                        - "-"
-                        - - !Select
-                            - !Select [
-                                0,
-                                !Ref Container6ContainerDependencyList,
-                              ]
-                            - !Ref ECRStacks
-                          - "ECRName"
-                    - !Select [0, !Ref Container6ContainerDependencyLinkNames]
-                - !Ref AWS::NoValue
+            # Links:
+            #   - !If
+            #     - Container6Has1OrMoreContainerDependencies
+            #     - !Join
+            #       - ":"
+            #       - - Fn::ImportValue: !Join
+            #             - "-"
+            #             - - !Select
+            #                 - !Select [
+            #                     0,
+            #                     !Ref Container6ContainerDependencyList,
+            #                   ]
+            #                 - !Ref ECRStacks
+            #               - "ECRName"
+            #         - !Select [0, !Ref Container6ContainerDependencyLinkNames]
+            #     - !Ref AWS::NoValue
             DependsOn:
               - !If
                 - Container6Has1OrMoreContainerDependencies
@@ -1960,22 +2109,22 @@ Resources:
                     - !Ref AWS::NoValue
                     - !Select [6, !Ref ECRTaskContainerPorts]
               - !Ref AWS::NoValue
-            Links:
-              - !If
-                - Container7Has1OrMoreContainerDependencies
-                - !Join
-                  - ":"
-                  - - Fn::ImportValue: !Join
-                        - "-"
-                        - - !Select
-                            - !Select [
-                                0,
-                                !Ref Container7ContainerDependencyList,
-                              ]
-                            - !Ref ECRStacks
-                          - "ECRName"
-                    - !Select [0, !Ref Container7ContainerDependencyLinkNames]
-                - !Ref AWS::NoValue
+            # Links:
+            #   - !If
+            #     - Container7Has1OrMoreContainerDependencies
+            #     - !Join
+            #       - ":"
+            #       - - Fn::ImportValue: !Join
+            #             - "-"
+            #             - - !Select
+            #                 - !Select [
+            #                     0,
+            #                     !Ref Container7ContainerDependencyList,
+            #                   ]
+            #                 - !Ref ECRStacks
+            #               - "ECRName"
+            #         - !Select [0, !Ref Container7ContainerDependencyLinkNames]
+            #     - !Ref AWS::NoValue
             DependsOn:
               - !If
                 - Container7Has1OrMoreContainerDependencies
@@ -2049,130 +2198,335 @@ Resources:
                     !Select [2, !Split [",", !Ref Container7MountPoint3]]
                 - !Ref AWS::NoValue
           - !Ref AWS::NoValue
-        - Name:
-            Fn::ImportValue:
-              !Join ["-", [!Select [0, !Ref ECRStacks], "ECRName"]]
-          Image: !Join
-            - ""
-            - - !Ref AWS::AccountId
-              - ".dkr.ecr."
-              - !Ref AWS::Region
-              - ".amazonaws.com/"
-              - Fn::ImportValue:
-                  !Join ["-", [!Select [0, !Ref ECRStacks], "ECRName"]]
-              - ":"
-              - !Select [0, !Ref ECRTaskTags]
-          Command: !If
-            - Container1ContainerHasCommand
-            - !Ref Container1ContainerCommand
-            - !Ref AWS::NoValue
-          Links:
-            - !If
-              - Container1Has1OrMoreContainerDependencies
-              - !Join
+        - !If
+          - HasAtLeast1TargetContainersCondition
+          - Name:
+              Fn::ImportValue:
+                !Join ["-", [!Select [0, !Ref ECRStacks], "ECRName"]]
+            Image: !Join
+              - ""
+              - - !Ref AWS::AccountId
+                - ".dkr.ecr."
+                - !Ref AWS::Region
+                - ".amazonaws.com/"
+                - Fn::ImportValue:
+                    !Join ["-", [!Select [0, !Ref ECRStacks], "ECRName"]]
                 - ":"
-                - - Fn::ImportValue: !Join
+                - !Select [0, !Ref ECRTaskTags]
+            Command: !If
+              - Container1ContainerHasCommand
+              - !Ref Container1ContainerCommand
+              - !Ref AWS::NoValue
+            # Links:
+            #   - !If
+            #     - Container1Has1OrMoreContainerDependencies
+            #     - !Join
+            #       - ":"
+            #       - - Fn::ImportValue: !Join
+            #             - "-"
+            #             - - !Select
+            #                 - !Select [0, !Ref Container1ContainerDependencyList]
+            #                 - !Ref ECRStacks
+            #               - "ECRName"
+            #         - !Select [0, !Ref Container1ContainerDependencyLinkNames]
+            #     - !Ref AWS::NoValue
+            PortMappings: !If
+              - Container1HasExposedPorts
+              - - ContainerPort: !Select [0, !Ref ECRTaskContainerPorts]
+                  HostPort: !If
+                    - EnableDynamicPortsCondition
+                    - !Ref AWS::NoValue
+                    - !Select [0, !Ref ECRTaskContainerPorts]
+              - !Ref AWS::NoValue
+            DependsOn:
+              - !If
+                - Container1Has1OrMoreContainerDependencies
+                - Condition: START
+                  ContainerName:
+                    Fn::ImportValue: !Join
                       - "-"
                       - - !Select
-                          - !Select [0, !Ref Container1ContainerDependencyList]
+                          - !Select [0, !Split [",", !Ref Container1ContainerDependencyList ] ]
                           - !Ref ECRStacks
                         - "ECRName"
-                  - !Select [0, !Ref Container1ContainerDependencyLinkNames]
+                - !Ref AWS::NoValue
+              # - !If
+              #   - Container1Has2OrMoreContainerDependencies
+              #   - Condition: START
+              #     ContainerName:
+              #       Fn::ImportValue: !Join
+              #         - "-"
+              #         - - !Select
+              #             - !Select [1, !Ref Container1ContainerDependencyList]
+              #             - !Ref ECRStacks
+              #           - "ECRName"
+              #   - !Ref AWS::NoValue
+              # - !If
+              #   - Container1Has3OrMoreContainerDependencies
+              #   - Condition: START
+              #     ContainerName:
+              #       Fn::ImportValue: !Join
+              #         - "-"
+              #         - - !Select
+              #             - !Select [2, !Ref Container1ContainerDependencyList]
+              #             - !Ref ECRStacks
+              #           - "ECRName"
+              #   - !Ref AWS::NoValue
+            MemoryReservation: !If
+              - ContainersHaveMemoryReservationsCondition
+              - !Select [0, !Ref MemoryReservations]
               - !Ref AWS::NoValue
-          PortMappings: !If
-            - Container1HasExposedPorts
-            - - ContainerPort: !Select [0, !Ref ECRTaskContainerPorts]
-                HostPort: !If
-                  - EnableDynamicPortsCondition
-                  - !Ref AWS::NoValue
-                  - !Select [0, !Ref ECRTaskContainerPorts]
-            - !Ref AWS::NoValue
-          DependsOn:
-            - !If
-              - Container1Has1OrMoreContainerDependencies
-              - Condition: START
-                ContainerName:
-                  Fn::ImportValue: !Join
-                    - "-"
-                    - - !Select
-                        - !Select [0, !Ref Container1ContainerDependencyList]
-                        - !Ref ECRStacks
-                      - "ECRName"
-              - !Ref AWS::NoValue
-          MemoryReservation: !If
-            - ContainersHaveMemoryReservationsCondition
-            - !Select [0, !Ref MemoryReservations]
-            - !Ref AWS::NoValue
-          # Send logs to CloudWatch Logs
-          Secrets:
-            - !If
-              - Target1UsesSecretStack
-              - Name: ENV_FROM_JSON
-                ValueFrom:
-                  Fn::ImportValue:
-                    !Join ["-", [!Select [0, !Ref SecretStacks], "SecretArn"]]
-              - !Ref AWS::NoValue
-          LogConfiguration: !If
-            - EnableFirelensCondition
-            - LogDriver: awsfirelens
-              Options:
-                Name: firehose
-                Region: !Ref AWS::Region
-                delivery_stream: !Ref KinesisFirehoseDeliveryStream
-            - !If
-              - EnableFluentdCondition
-              - LogDriver: fluentd
+            # Send logs to CloudWatch Logs
+            Secrets:
+              - !If
+                - Target1UsesSecretStack
+                - Name: ENV_FROM_JSON
+                  ValueFrom:
+                    Fn::ImportValue:
+                      !Join ["-", [!Select [0, !Ref SecretStacks], "SecretArn"]]
+                - !Ref AWS::NoValue
+            LogConfiguration: !If
+              - EnableFirelensCondition
+              - LogDriver: awsfirelens
                 Options:
-                  fluentd-address: localhost:24224
-                  fluentd-async-connect: true
-                  mode: non-blocking
-              - LogDriver: awslogs
+                  Name: firehose
+                  Region: !Ref AWS::Region
+                  delivery_stream: !Ref KinesisFirehoseDeliveryStream
+              - !If
+                - EnableFluentdCondition
+                - LogDriver: fluentd
+                  Options:
+                    fluentd-address: localhost:24224
+                    fluentd-async-connect: true
+                    mode: non-blocking
+                - LogDriver: awslogs
+                  Options:
+                    awslogs-region: !Ref AWS::Region
+                    awslogs-group: !Ref LogGroup
+                    awslogs-stream-prefix: ecs
+                    mode: non-blocking
+            MountPoints:
+              - !If
+                - Container1HasMountPoint1
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container1MountPoint1]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container1MountPoint1]]
+                  ReadOnly: !Select [2, !Split [",", !Ref Container1MountPoint1]]
+                - !Ref AWS::NoValue
+              - !If
+                - Container1HasMountPoint2
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container1MountPoint2]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container1MountPoint2]]
+                  ReadOnly: !Select [2, !Split [",", !Ref Container1MountPoint2]]
+                - !Ref AWS::NoValue
+              - !If
+                - Container1HasMountPoint3
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container1MountPoint3]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container1MountPoint3]]
+                  ReadOnly: !Select [2, !Split [",", !Ref Container1MountPoint3]]
+                - !Ref AWS::NoValue
+              - !If
+                - Container1HasMountPoint4
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container1MountPoint4]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container1MountPoint4]]
+                  ReadOnly: !Select [2, !Split [",", !Ref Container1MountPoint4]]
+                - !Ref AWS::NoValue
+              - !If
+                - Container1HasMountPoint5
+                - ContainerPath:
+                    !Select [0, !Split [",", !Ref Container1MountPoint5]]
+                  SourceVolume:
+                    !Select [1, !Split [",", !Ref Container1MountPoint5]]
+                  ReadOnly: !Select [2, !Split [",", !Ref Container1MountPoint5]]
+                - !Ref AWS::NoValue
+          - !Ref AWS::NoValue
+        - !If
+          - HasAtLeast1TargetContainersConditionUsingExistingECRImage
+          - Name: 'existing-image-1'
+            Image: !Join
+              - ""
+              - - !Select [0, !Ref ECRImageARNs]
+                - ":"
+                - !Select [0, !Ref ECRImageTags]
+            # Command: !If
+            #   - Container1WithImageHasCommand
+            #   - !Ref Container1WithImageCommand
+            #   - !Ref AWS::NoValue
+            # Links:
+            #   - !If
+            #     - Container1Has1OrMoreContainerDependencies
+            #     - !Join
+            #       - ":"
+            #       - - Fn::ImportValue: !Join
+            #             - "-"
+            #             - - !Select
+            #                 - !Select [0, !Ref Container1ContainerDependencyList]
+            #                 - !Ref ECRStacks
+            #               - "ECRName"
+            #         - !Select [0, !Ref Container1ContainerDependencyLinkNames]
+            #     - !Ref AWS::NoValue
+            PortMappings: !If
+              - Container1ExistingImageHasExposedPorts
+              - - ContainerPort: !Select [0, !Ref ECRTaskFromImageContainerPorts]
+                  HostPort: !If
+                    - EnableDynamicPortsCondition
+                    - !Ref AWS::NoValue
+                    - !Select [0, !Ref ECRTaskContainerPorts]
+              - !Ref AWS::NoValue
+            Environment:
+              - Name: dbserver
+                Value: 192.168.1.132
+              - Name: PLAY_HTTP_PORT
+                Value: 9000
+            DependsOn:
+              - !If
+                - Container1Has1OrMoreContainerDependencies
+                - Condition: START
+                  ContainerName:
+                    Fn::ImportValue: !Join
+                      - "-"
+                      - - !Select
+                          - !Select [0, !Split [",", !Ref Container1ContainerDependencyList ] ]
+                          - !Ref ECRStacks
+                        - "ECRName"
+                - !Ref AWS::NoValue
+              # - !If
+              #   - Container1Has2OrMoreContainerDependencies
+              #   - Condition: START
+              #     ContainerName:
+              #       Fn::ImportValue: !Join
+              #         - "-"
+              #         - - !Select
+              #             - !Select [1, !Ref Container1ContainerDependencyList]
+              #             - !Ref ECRStacks
+              #           - "ECRName"
+              #   - !Ref AWS::NoValue
+              # - !If
+              #   - Container1Has3OrMoreContainerDependencies
+              #   - Condition: START
+              #     ContainerName:
+              #       Fn::ImportValue: !Join
+              #         - "-"
+              #         - - !Select
+              #             - !Select [2, !Ref Container1ContainerDependencyList]
+              #             - !Ref ECRStacks
+              #           - "ECRName"
+              #   - !Ref AWS::NoValue
+            MemoryReservation: !If
+              - ContainersHaveMemoryReservationsCondition
+              - !Select [0, !Ref MemoryReservations]
+              - !Ref AWS::NoValue
+            # Send logs to CloudWatch Logs
+            Secrets:
+              - !If
+                - Target1UsesSecretStack
+                - Name: ENV_FROM_JSON
+                  ValueFrom:
+                    Fn::ImportValue:
+                      !Join ["-", [!Select [0, !Ref SecretStacks], "SecretArn"]]
+                - !Ref AWS::NoValue
+            LogConfiguration: !If
+              - EnableFirelensCondition
+              - LogDriver: awsfirelens
                 Options:
-                  awslogs-region: !Ref AWS::Region
-                  awslogs-group: !Ref LogGroup
-                  awslogs-stream-prefix: ecs
-                  mode: non-blocking
-          MountPoints:
-            - !If
-              - Container1HasMountPoint1
-              - ContainerPath:
-                  !Select [0, !Split [",", !Ref Container1MountPoint1]]
-                SourceVolume:
-                  !Select [1, !Split [",", !Ref Container1MountPoint1]]
-                ReadOnly: !Select [2, !Split [",", !Ref Container1MountPoint1]]
+                  Name: firehose
+                  Region: !Ref AWS::Region
+                  delivery_stream: !Ref KinesisFirehoseDeliveryStream
+              - !If
+                - EnableFluentdCondition
+                - LogDriver: fluentd
+                  Options:
+                    fluentd-address: localhost:24224
+                    fluentd-async-connect: true
+                    mode: non-blocking
+                - LogDriver: awslogs
+                  Options:
+                    awslogs-region: !Ref AWS::Region
+                    awslogs-group: !Ref LogGroup
+                    awslogs-stream-prefix: ecs
+                    mode: non-blocking
+          - !Ref AWS::NoValue
+        - !If
+          - HasAtLeast2TargetContainersConditionUsingExistingECRImage
+          - Name: 'existing-image-2'
+            Image: !Join
+              - ""
+              - - !Select [1, !Ref ECRImageARNs]
+                - ":"
+                - !Select [1, !Ref ECRImageTags]
+            # Command: !If
+            #   - Container2WithImageHasCommand
+            #   - !Ref Container2WithImageCommand
+            #   - !Ref AWS::NoValue
+            # Links:
+            #   - !If
+            #     - Container1Has1OrMoreContainerDependencies
+            #     - !Join
+            #       - ":"
+            #       - - Fn::ImportValue: !Join
+            #             - "-"
+            #             - - !Select
+            #                 - !Select [0, !Ref Container1ContainerDependencyList]
+            #                 - !Ref ECRStacks
+            #               - "ECRName"
+            #         - !Select [0, !Ref Container1ContainerDependencyLinkNames]
+            #     - !Ref AWS::NoValue
+            PortMappings: !If
+              - Container2ExistingImageHasExposedPorts
+              - - ContainerPort: !Select [1, !Ref ECRTaskFromImageContainerPorts]
+                  HostPort: !If
+                    - EnableDynamicPortsCondition
+                    - !Ref AWS::NoValue
+                    - !Select [1, !Ref ECRTaskContainerPorts]
               - !Ref AWS::NoValue
-            - !If
-              - Container1HasMountPoint2
-              - ContainerPath:
-                  !Select [0, !Split [",", !Ref Container1MountPoint2]]
-                SourceVolume:
-                  !Select [1, !Split [",", !Ref Container1MountPoint2]]
-                ReadOnly: !Select [2, !Split [",", !Ref Container1MountPoint2]]
+            Environment:
+              - Name: dbserver
+                Value: 192.168.1.132
+              - Name: PLAY_HTTP_PORT
+                Value: 9001
+              - Name: PLAY_HTTPS_PORT
+                Value: 9001
+            MemoryReservation: !If
+              - ContainersHaveMemoryReservationsCondition
+              - !Select [1, !Ref MemoryReservations]
               - !Ref AWS::NoValue
-            - !If
-              - Container1HasMountPoint3
-              - ContainerPath:
-                  !Select [0, !Split [",", !Ref Container1MountPoint3]]
-                SourceVolume:
-                  !Select [1, !Split [",", !Ref Container1MountPoint3]]
-                ReadOnly: !Select [2, !Split [",", !Ref Container1MountPoint3]]
-              - !Ref AWS::NoValue
-            - !If
-              - Container1HasMountPoint4
-              - ContainerPath:
-                  !Select [0, !Split [",", !Ref Container1MountPoint4]]
-                SourceVolume:
-                  !Select [1, !Split [",", !Ref Container1MountPoint4]]
-                ReadOnly: !Select [2, !Split [",", !Ref Container1MountPoint4]]
-              - !Ref AWS::NoValue
-            - !If
-              - Container1HasMountPoint5
-              - ContainerPath:
-                  !Select [0, !Split [",", !Ref Container1MountPoint5]]
-                SourceVolume:
-                  !Select [1, !Split [",", !Ref Container1MountPoint5]]
-                ReadOnly: !Select [2, !Split [",", !Ref Container1MountPoint5]]
-              - !Ref AWS::NoValue
+            # Send logs to CloudWatch Logs
+            Secrets:
+              - !If
+                - Target2UsesSecretStack
+                - Name: ENV_FROM_JSON
+                  ValueFrom:
+                    Fn::ImportValue:
+                      !Join ["-", [!Select [1, !Ref SecretStacks], "SecretArn"]]
+                - !Ref AWS::NoValue
+            LogConfiguration: !If
+              - EnableFirelensCondition
+              - LogDriver: awsfirelens
+                Options:
+                  Name: firehose
+                  Region: !Ref AWS::Region
+                  delivery_stream: !Ref KinesisFirehoseDeliveryStream
+              - !If
+                - EnableFluentdCondition
+                - LogDriver: fluentd
+                  Options:
+                    fluentd-address: localhost:24224
+                    fluentd-async-connect: true
+                    mode: non-blocking
+                - LogDriver: awslogs
+                  Options:
+                    awslogs-region: !Ref AWS::Region
+                    awslogs-group: !Ref LogGroup
+                    awslogs-stream-prefix: ecs
+                    mode: non-blocking
+          - !Ref AWS::NoValue
   # A role needed by ECS
   TaskExecutionRole:
     Type: AWS::IAM::Role
@@ -2315,7 +2669,10 @@ Resources:
       TaskDefinition: !If
         - HasAtLeast1TargetContainersCondition
         - !Ref TaskDefinition
-        - !Ref AWS::NoValue
+        - !If 
+          - HasAtLeast1TargetContainersConditionUsingExistingECRImage
+          - !Ref TaskDefinition
+          - !Ref AWS::NoValue
       DeploymentConfiguration:
         MinimumHealthyPercent: 100
         MaximumPercent: 200
@@ -2349,18 +2706,24 @@ Resources:
                     ],
                   ]
         - !Ref AWS::NoValue
-      LoadBalancers:
+      LoadBalancers: 
         - !If
           - CreateLoadBalancerCondition
-          - ContainerName:
-              Fn::ImportValue:
-                !Join [
-                  "-",
-                  [!Select [!Ref TargetContainer, !Ref ECRStacks], "ECRName"],
-                ]
-            ContainerPort:
-              !Select [!Ref TargetContainer, !Ref ECRTaskContainerPorts]
-            TargetGroupArn: !Ref TargetGroup
+          - !If
+            - HasAtLeast1TargetContainersCondition
+            - ContainerName:
+                Fn::ImportValue:
+                  !Join [
+                    "-",
+                    [!Select [!Ref TargetContainer, !Ref ECRStacks], "ECRName"],
+                  ]
+              ContainerPort:
+                !Select [!Ref TargetContainer, !Ref ECRTaskContainerPorts]
+              TargetGroupArn: !Ref TargetGroup
+            - ContainerName: 'existing-image-2'
+              ContainerPort:
+                !Select [!Ref TargetContainer, !Ref ECRTaskFromImageContainerPorts]
+              TargetGroupArn: !Ref TargetGroup
           - !Ref AWS::NoValue
       PlatformVersion: !If
         - IsFargateLaunchType
@@ -2478,11 +2841,21 @@ Resources:
       Matcher:
         HttpCode: !Ref MatcherHttpCode
       Name: !Join ["", [!Ref ServiceName, TG]]
-      Port: !Select [0, !Ref ECRTaskContainerPorts]
+      Port: !Select [!Ref TargetContainer, !Ref ECRTaskContainerPorts]
       Protocol: HTTP
       TargetGroupAttributes:
         - Key: deregistration_delay.timeout_seconds
           Value: "60" # default is 300
+        - !If 
+          - EnableLoadBalancerSessionStickiness
+          - Key: stickiness.enabled
+            Value: true
+          - !Ref AWS::NoValue
+        - !If 
+          - EnableLoadBalancerSessionStickiness
+          - Key: stickiness.type
+            Value: !Ref LoadBalancerStickinessType
+          - !Ref AWS::NoValue
       TargetType: !If
         - UseIPTargetType
         - ip

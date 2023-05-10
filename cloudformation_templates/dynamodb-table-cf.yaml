@@ -1,0 +1,37 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: ---
+
+Parameters: 
+  BillingMode:
+    Description: Specify how you are charged for read and write throughput and how you manage capacity.
+    Type: String
+    Default: PAY_PER_REQUEST
+    AllowedValues:
+      - PROVISIONED
+      - PAY_PER_REQUEST
+  TableName:
+    Description: Name of the DynamoDB Table
+    Type: String
+      
+Conditions: 
+  UsesProvisionedThroughputCondition: !Equals 
+    - !Ref BillingMode
+    - PROVISIONED
+  UsesPayPerRequestCondition: !Not UsesProvisionedThroughputCondition
+
+Resources: 
+  SimpleTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions: 
+        - AttributeName: "Album"
+          AttributeType: "S"
+        - AttributeName: "Artist"
+          AttributeType: "S"
+      BillingMode: !Ref BillingMode
+      KeySchema: 
+        - AttributeName: "Album"
+          KeyType: "HASH"
+        - AttributeName: "Artist"
+          KeyType: "RANGE"
+      TableName: !Ref TableName

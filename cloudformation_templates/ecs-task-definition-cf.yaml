@@ -273,6 +273,12 @@ Parameters:
     Type: String
     Description: Container Path, Source Volume, Read ReadOnly
     Default: ""
+  Container1WithImageCommand:
+    Type: List<String>
+    Defautl: ""
+  Container2WithImageCommand:
+    Type: List<String>
+    Defautl: ""
   ContainersHaveMemoryReservations:
     Type: String
     Default: false
@@ -706,6 +712,14 @@ Conditions:
   Container10HasMountPoint3: !Not
     - !Equals
       - !Ref Container10MountPoint3
+      - ""
+  Container1WithImageHasCommand: !Not
+    - !Equals
+      - !Join ["", !Ref Container1WithImageCommand]
+      - ""
+  Container2WithImageHasCommand: !Not
+    - !Equals
+      - !Join ["", !Ref Container2WithImageCommand]
       - ""
   ContainersHaveMemoryReservationsCondition: !Equals
     - !Ref ContainersHaveMemoryReservations

@@ -1,39 +1,36 @@
 Parameters:
-  ClusterName:
-    Type: String
-    Description: Name of the cluster
   EnableContainerInsights:
     Type: String
     Description: Enable Container Insights 
-    Default: false
+    Default: 'false'
     AllowedValues:
-      - true
-      - false
+      - 'true'
+      - 'false'
   EnvironmentStage:
     Type: String
     Description: Designates the environment stage of the associated AWS resource. (Optional)
     AllowedValues:
-      - dev
-      - test
-      - pre-prod
-      - prod
-      - none
-    Default: none
+      - 'dev'
+      - 'test'
+      - 'pre-prod'
+      - 'prod'
+      - 'none'
+    Default: 'none'
 Conditions:
   EnableContainerInsightsCondition: !Equals
     - !Ref EnableContainerInsights
-    - true
+    - 'true'
 Resources:
   Cluster:
     Type: AWS::ECS::Cluster
     Properties:
-      ClusterName: !Join ['-', [!Ref EnvironmentStage, !Ref ClusterName, Cluster]]
+      ClusterName: !Join 
+        - '-'
+        - - !Ref EnvironmentStage
+          - !Ref ClusterName, Cluster
       ClusterSettings:
         - Name: containerInsights
-          Value: !If 
-            - EnableContainerInsightsCondition
-            - enabled
-            - disabled
+          Value: !If [EnableContainerInsightsCondition, 'enabled', 'disabled']
 Outputs:
   Cluster:
     Description: Customer name
