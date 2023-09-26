@@ -1,4 +1,9 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: A CloudFormation template to setup an ECS Cluster
 Parameters:
+  CapacityProviders:
+    Description: The short name of one or more capacity providers to associate with the cluster.
+    Type: CommaDelimitedList
   EnableContainerInsights:
     Type: String
     Description: Enable Container Insights 
@@ -24,10 +29,8 @@ Resources:
   Cluster:
     Type: AWS::ECS::Cluster
     Properties:
-      ClusterName: !Join 
-        - '-'
-        - - !Ref EnvironmentStage
-          - !Ref ClusterName, Cluster
+      CapacityProviders: !Ref CapacityProviders
+      ClusterName: !Sub '${AWS::StackName}-Cluster'
       ClusterSettings:
         - Name: containerInsights
           Value: !If [EnableContainerInsightsCondition, 'enabled', 'disabled']

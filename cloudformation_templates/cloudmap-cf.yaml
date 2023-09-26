@@ -1,0 +1,22 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: An example CloudFormation template for Fargate.
+Resources:
+  PrivateDnsNamespace:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+    Properties:
+      Name: 'oorah-dev-private-namespace'
+      Description: 'An HTTP namespace for ECS service discovery'
+      Vpc: vpc-03085d107f43c6b8f
+      Properties:
+        DnsProperties:
+          SOA: 
+            TTL: 60
+
+
+Outputs:
+  NamespaceId:
+    Description: 'The ID of the created namespace'
+    Value: !Ref PrivateDnsNamespace
+  NamespaceARN:
+    Description: 'The ARN of the created namespace'
+    Value: !GetAtt PrivateDnsNamespace.Arn
