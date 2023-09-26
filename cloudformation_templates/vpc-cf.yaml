@@ -1,78 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
   This template creates a Multi-AZ, multi-subnet VPC infrastructure with managed NAT
-  gateways in the public subnet for each Availability Zone. 
-Metadata:
-  AWS::CloudFormation::Interface:
-    ParameterGroups:
-      - Label:
-          default: Availability Zone Configuration
-        Parameters:
-          - AvailabilityZones
-          - NumberOfAZs
-      - Label:
-          default: Network Configuration
-        Parameters:
-          - VPCCIDR
-          - CreatePublicSubnets
-          - PublicSubnet1CIDR
-          - PublicSubnet2CIDR
-          - PublicSubnetTag1
-          - PublicSubnetTag2
-          - PublicSubnetTag3
-          - CreatePrivateSubnets
-          - CreateNATGateways
-          - PrivateSubnet1ACIDR
-          - PrivateSubnetATag1
-          - PrivateSubnetATag2
-          - PrivateSubnetATag3
-          - PrivateSubnet1BCIDR
-          - PrivateSubnetBTag1
-          - PrivateSubnetBTag2
-          - PrivateSubnetBTag3
-          - VPCTenancy
-      - Label:
-          default: 'Deprecated: NAT Instance Configuration'
-        Parameters:
-          - KeyPairName
-          - NATInstanceType
-    ParameterLabels:
-      AvailabilityZones:
-        default: Availability Zones
-      CreateNATGateways:
-        default: Create NAT Gateways
-      CreatePublicSubnets:
-        default: Create public subnets
-      CreatePrivateSubnets:
-        default: Create private subnets
-      PrivateSubnet1ACIDR:
-        default: Private subnet 1A CIDR
-      PrivateSubnet1BCIDR:
-        default: Private subnet 1B with dedicated network ACL CIDR
-      PrivateSubnetATag1:
-        default: Tag for Private A Subnets
-      PrivateSubnetATag2:
-        default: Tag for Private A Subnets
-      PrivateSubnetATag3:
-        default: Tag for Private A Subnets
-      PrivateSubnetBTag1:
-        default: Tag for Private B Subnets
-      PrivateSubnetBTag2:
-        default: Tag for Private B Subnets
-      PrivateSubnetBTag3:
-        default: Tag for Private B Subnets
-      PublicSubnet1CIDR:
-        default: Public subnet 1 CIDR
-      PublicSubnet2CIDR:
-        default: Public subnet 2 CIDR
-      PublicSubnetTag1:
-        default: Tag for Public Subnets
-      PublicSubnetTag2:
-        default: Tag for Public Subnets
-      VPCCIDR:
-        default: VPC CIDR
-      VPCTenancy:
-        default: VPC Tenancy
+  gateways in the public subnet for each Availability Zone.
 Parameters:
   AvailabilityZones:
     Description: 'List of Availability Zones to use for the subnets in the VPC. Note:

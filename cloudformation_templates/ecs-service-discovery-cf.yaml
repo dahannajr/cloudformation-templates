@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS CloudFormation template to create a Service Discovery namespace for ECS'
+
+Parameters:
+  VPCStackName:
+    Description: 'Name of the stack that exports the VPC ID'
+    Type: 'String'
+
+  DnsDomainName:
+    Description: 'Name to assign to the DNS domain'
+    Type: 'String'
+    Default: 'example.local'
+
+  ServiceName:
+    Description: 'Name to assign to the Service'
+    Type: 'String'
+    Default: 'ecsservice'
+
+Resources:
+  ServiceDiscoveryNamespace:
+    Type: "AWS::ServiceDiscovery::PrivateDnsNamespace"
+    Properties:
+      Name: !Ref DnsDomainName
+      Description: "Private DNS namespace for ECS service discovery"
+      Vpc: 
+        Fn::ImportValue:
+          !Sub "${VPCStackName}-VPCID"
+
+  EcsServiceDiscoveryService:
+    Type: "AWS::ServiceDiscovery::Service"
+    Properties:
+      Description: "Service discovery service for ECS"
+      DnsConfig:
+        DnsRecords:
+          - Type: "A"
+            TTL: "60"
+        NamespaceId:
+          Ref: "ServiceDiscoveryNamespace"
+      Name: !Ref ServiceName
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+
+Outputs:
+  NamespaceId:
+    Description: "The ID of the Service Discovery Namespace"
+    Value:
+      Ref: "ServiceDiscoveryNamespace"
+    Export:
+      Name: !Sub "${AWS::StackName}-NamespaceId"
+
+  ServiceId:
+    Description: "The ID of the Service Discovery Service"
+    Value:
+      Ref: "EcsServiceDiscoveryService"
+    Export:
+      Name: !Sub "${AWS::StackName}-ServiceId"
