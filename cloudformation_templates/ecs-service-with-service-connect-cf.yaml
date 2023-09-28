@@ -21,12 +21,16 @@ Parameters:
     Description: Port to expose from the Task Instance
     Type: Number
     Default: 0
-  Container1SecretsArn:
+  Container1SecretArns:
     Description: ARN of the secrets manager containing JSON elements for use in the containers environment setup.
     Type: CommaDelimitedList
     Default: ""
-  Container1SecretsItemList:
-    Description: Command seperated string of keys used to pull in the environment variables.
+  Container1SecretKeys:
+    Description: 0 based index into the SecretARNs list, followed by the JSON Key of the variable
+    Type: CommaDelimitedList
+    Default: ""
+  Container1SecretsDefinitionNameList:
+    Description: Command seperated string of environment variable to be used in the container definition.
     Type: CommaDelimitedList
     Default: ""
   DesiredTaskInstancesInService:
@@ -138,13 +142,13 @@ Resources:
               Name: !Sub "${Container1ContainerName}-${Container1Port}"
               AppProtocol: !Ref Container1AppProtocol
               Protocol: tcp
-          # Send logs to CloudWatch Logs
           Secrets:
             'Fn::Transform':
                 Name: ECSSecretsTransformation
                 Parameters:
-                  Name: !Ref Container1SecretsItemList
-                  ValueFrom: !Ref Container1SecretsArn
+                  Names: !Ref Container1SecretsDefinitionNameList
+                  SecretArns: !Ref Container1SecretArns
+                  SecretKeys: !Ref Container1SecretKeys
           LogConfiguration: 
             LogDriver: awslogs
             Options:
@@ -288,5 +292,6 @@ Resources:
         Services:
           - ClientAliases:
               - Port: !Ref Container1Port
+                DnsName: !Ref Container1ContainerName
             DiscoveryName: !Ref Container1ContainerName
             PortName: !Sub "${Container1ContainerName}-${Container1Port}"

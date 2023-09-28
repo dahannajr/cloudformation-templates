@@ -44,12 +44,16 @@ while true; do
     --query "Stacks[0].StackStatus" --output text)
 
   case $STACK_STATUS in
-    CREATE_IN_PROGRESS|DELETE_IN_PROGRESS)
+    CREATE_IN_PROGRESS|DELETE_IN_PROGRESS|UPDATE_IN_PROGRESS)
       echo "Current stack status: $STACK_STATUS. Waiting..."
       sleep 10
       ;;
     CREATE_COMPLETE)
       echo "Stack creation completed!"
+      break
+      ;;
+    UPDATE_COMPLETE)
+      echo "Stack update completed!"
       break
       ;;
     DELETE_COMPLETE)
