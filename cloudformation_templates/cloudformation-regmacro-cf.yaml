@@ -1,0 +1,42 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Register Transform Macro
+Parameters:
+  MacroName:
+    Type: String
+  FunctionArn:
+    Type: String
+Resources:
+  MacroLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${MacroName}"
+  ECSSecretsMacro:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Name: !Ref MacroName
+      FunctionName: !Ref FunctionArn
+      LogGroupName: !Ref MacroLogGroup
+      LogRoleARN: !GetAtt MacroLogRole.Arn
+  MacroLogRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - cloudformation.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+      - PolicyName: MacroLoggingPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: !GetAtt MacroLogGroup.Arn
