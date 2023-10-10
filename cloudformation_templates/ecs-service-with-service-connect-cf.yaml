@@ -1,8 +1,13 @@
 AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::LanguageExtensions
 Description: A CloudFormation template to setup ECS Service and Task Definitions for use in Service Connect
 Parameters:
   Container1AppProtocol:
     Description: The application protocol that's used for the port mapping. This parameter only applies to Service Connect. 
+    Type: String
+    Default: ""
+  Container1Command:
+    Description: Command Override for Container 1
     Type: String
     Default: ""
   Container1ContainerName:
@@ -90,6 +95,8 @@ Parameters:
     AllowedValues:
       - X86_64
       - ARM64
+  RegistryStack:
+    Type: String
   SecurityGroupStackName:
     Type: String
     Default: ""
@@ -102,6 +109,15 @@ Parameters:
   VPCStackName:
     Description: Name of the stack used to create the VPC
     Type: String
+Conditions:
+  Container1HasCommand: !Not 
+    - !Equals 
+      - !Ref Container1Command
+      - ''
+  Container1HasAppProtocol: !Not 
+    - !Equals 
+      - !Ref Container1AppProtocol
+      - ''
 Resources:
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -136,11 +152,18 @@ Resources:
             - ":"
             - - !Ref Container1ImageArn
               - !Ref Container1ImageTag
+          Command: !If 
+            - Container1HasCommand
+            - !Split [',', !Ref Container1Command]
+            - !Ref AWS::NoValue
           PortMappings: 
             - ContainerPort: !Ref Container1Port
               HostPort: !Ref Container1Port
               Name: !Sub "${Container1ContainerName}-${Container1Port}"
-              AppProtocol: !Ref Container1AppProtocol
+              AppProtocol: !If 
+                - Container1HasAppProtocol
+                - !Ref Container1AppProtocol
+                - !Ref AWS::NoValue
               Protocol: tcp
           Secrets:
             'Fn::Transform':
@@ -275,6 +298,8 @@ Resources:
             - sg-0862003e313464ceb
       
       PlatformVersion: 1.4.0
+      ServiceRegistries:
+        - RegistryArn: !GetAtt ServiceDiscovery.Arn
       ServiceConnectConfiguration: 
         Enabled: true
         LogConfiguration: 
@@ -293,5 +318,16 @@ Resources:
           - ClientAliases:
               - Port: !Ref Container1Port
                 DnsName: !Ref Container1ContainerName
-            DiscoveryName: !Ref Container1ContainerName
             PortName: !Sub "${Container1ContainerName}-${Container1Port}"
+  ServiceDiscovery:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: !Ref Container1ContainerName
+      DnsConfig:
+        DnsRecords:
+          - TTL: 15
+            Type: A
+      NamespaceId: 
+        Fn::ImportValue: !Join ["-", [!Ref RegistryStack, "NamespaceId"]]
+      HealthCheckCustomConfig:
+        FailureThreshold: 1

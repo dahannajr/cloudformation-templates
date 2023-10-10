@@ -47,10 +47,14 @@ Outputs:
       Ref: "ServiceDiscoveryNamespace"
     Export:
       Name: !Sub "${AWS::StackName}-NamespaceId"
-
   ServiceId:
     Description: "The ID of the Service Discovery Service"
     Value:
       Ref: "EcsServiceDiscoveryService"
     Export:
       Name: !Sub "${AWS::StackName}-ServiceId"
+  ServiceArn:
+    Description: "The ARN of the Service Discovery Service"
+    Value: !GetAtt EcsServiceDiscoveryService.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-ServiceArn"
