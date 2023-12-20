@@ -295,8 +295,6 @@ Resources:
                     !Ref SecurityGroupStackExportVariableName,
                   ],
                 ]
-            - sg-0862003e313464ceb
-      
       PlatformVersion: 1.4.0
       ServiceRegistries:
         - RegistryArn: !GetAtt ServiceDiscovery.Arn
