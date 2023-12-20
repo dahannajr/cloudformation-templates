@@ -313,7 +313,15 @@ Resources:
             awslogs-region: us-east-1
             awslogs-stream-prefix: ecs
             awslogs-create-group: true
-        Namespace: arn:aws:servicediscovery:us-east-1:035913458583:namespace/ns-mlyke4zmaft47ohh
+        Namespace: !Join
+          - '' # delimiter is an empty string
+          - - 'arn:aws:servicediscovery:'
+            - !Sub '${AWS::Region}' # dynamically insert the AWS region
+            - ':'
+            - !Sub '${AWS::AccountId}' # dynamically insert the AWS account ID
+            - ':namespace/'
+            - Fn::ImportValue: !Join ["-", [!Ref RegistryStack, "NamespaceId"]] # import the namespace ID
+
         Services:
           - ClientAliases:
               - Port: !Ref Container1Port
