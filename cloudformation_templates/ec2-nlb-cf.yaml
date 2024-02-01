@@ -1,0 +1,45 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation Template for Internal Network Load Balancer
+
+Parameters:
+  VPCStackName:
+    Type: String
+    Description: Name of the VPC stack to associate with the NLB
+
+  SubnetIDs:
+    Type: CommaDelimitedList
+    Description: Comma-delimited list of subnet IDs
+
+  SecurityGroupStackName:
+    Type: String
+    Description: Name of the stack that contains the security group
+
+Resources:
+  InternalNetworkLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${AWS::StackName}-NLB"
+      Scheme: internal
+      Type: network
+      LoadBalancerAttributes:
+        - Key: load_balancing.cross_zone.enabled
+          Value: true
+      Subnets:
+        - Fn::ImportValue:
+            !Sub 
+              - "${VPCStackName}-${SubnetExportName}"
+              - SubnetExportName: !Select [ 0, !Ref SubnetIDs ] 
+        - Fn::ImportValue:
+            !Sub 
+              - "${VPCStackName}-${SubnetExportName}"
+              - SubnetExportName: !Select [ 1, !Ref SubnetIDs ] 
+        # Add more subnets if required
+      SecurityGroups:
+        - Fn::ImportValue: !Join [ "-", [ !Ref SecurityGroupStackName, "SecurityGroupId"]]
+
+Outputs:
+  NetworkLoadBalancerArn:
+    Description: ARN of the Network Load Balancer
+    Value: !Ref InternalNetworkLoadBalancer
+    Export:
+      Name: !Sub "${AWS::StackName}-NetworkLoadBalancerArn"
