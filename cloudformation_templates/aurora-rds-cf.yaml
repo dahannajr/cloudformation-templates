@@ -51,7 +51,10 @@ Parameters:
     AllowedValues:
       - "Aurora-MySQL5.6"
       - "Aurora-MySQL5.7"
-      - "Aurora-PostgreSQL11.6"
+      - "Aurora-PostgreSQL11"
+      - "Aurora-PostgreSQL12"
+      - "RDS-PostgreSQL11"
+      - "RDS-PostgreSQL12"
       - "Aurora-PostgreSQL10.12"
       - "RDS-MySQL8.0"
       - "RDS-SQLServerExpress-15"
@@ -61,6 +64,7 @@ Parameters:
     Default: "provisioned"
     AllowedValues:
       - "rds"
+      - "rds-with-read-replica"
       - "provisioned"
       - "parallelquery"
       - "serverless"
@@ -142,6 +146,7 @@ Parameters:
       - test
       - pre-prod
       - prod
+      - spike
       - none
     Default: none
   Confidentiality:
@@ -257,10 +262,32 @@ Mappings:
       "engine": "aurora-postgresql"
       "enginefamily": "POSTGRES"
       "cloudwatchlogexports": ""
-    "Aurora-PostgreSQL11.6":
+    "Aurora-PostgreSQL11":
       "family": "aurora-postgresql11"
-      "engineversion": "11.6"
+      "engineversion": "11.22"
       "enginename": "aurora-postgresql"
+      "engine": "aurora-postgresql"
+      "enginefamily": "POSTGRES"
+      "cloudwatchlogexports": ""
+    "RDS-PostgreSQL11":
+      "family": "postgresql11"
+      "engineversion": "11.22"
+      "enginename": "postgres"
+      "engine": "postgres"
+      "enginefamily": "POSTGRES"
+      "cloudwatchlogexports": ""
+    "RDS-PostgreSQL12":
+      "family": "postgresql12"
+      "engineversion": "12.17"
+      "enginename": "postgres"
+      "engine": "postgres"
+      "enginefamily": "POSTGRES"
+      "cloudwatchlogexports": ""
+    "Aurora-PostgreSQL12":
+      "family": "aurora-postgresql12"
+      "engineversion": "12.17"
+      "enginename": "aurora-postgresql"
+      "engine": "aurora-postgresql"
       "enginefamily": "POSTGRES"
       "cloudwatchlogexports": ""
     "RDS-SQLServerExpress-15":
@@ -271,6 +298,9 @@ Mappings:
       "enginefamily": "sqlserver-ex-15.0"
       "cloudwatchlogexports": "error"
 Conditions:
+  CreateRDSReadReplication: !Equals
+    - !Ref DBEngineMode
+    - "rds-with-read-replica"
   IsKMSKeyIdSuppliedCondition: !Not
     - !Equals
       - !Ref KmsKeyId
@@ -294,13 +324,22 @@ Conditions:
   DBPasswordRotation: !Equals
     - !Ref RotateDBPassword
     - "true"
-  IsAuroraCondition: !Not
+  IsAuroraCondition: !And 
+    - !Not
+      - !Equals
+        - !Ref DBEngineMode
+        - "rds"
+    - !Not 
+      - !Equals 
+        - !Ref DBEngineMode
+        - "rds-with-read-replica"
+  IsRDSCondition: !Or 
     - !Equals
       - !Ref DBEngineMode
       - "rds"
-  IsRDSCondition: !Equals
-    - !Ref DBEngineMode
-    - "rds"
+    - !Equals
+      - !Ref DBEngineMode
+      - "rds-with-read-replica"
   IsServerlessEnabled: !Equals
     - !Ref DBEngineMode
     - "serverless"
@@ -471,14 +510,7 @@ Resources:
         ]
       DBSubnetGroupName: !Ref DBSubnetGroup
       EnableCloudwatchLogsExports:
-        !Split [
-          ",",
-          !FindInMap [
-            DBFamilyMap,
-            !Ref DBEngineVersion,
-            "cloudwatchlogexports",
-          ],
-        ]
+        !If [DoEnableCWLogExport, !Ref DBCWLogExports, !Ref "AWS::NoValue"]
       EnablePerformanceInsights: !If [EnablePI, true, !Ref "AWS::NoValue"]
       Engine: !FindInMap [DBFamilyMap, !Ref DBEngineVersion, "engine"]
       EngineVersion:
@@ -529,6 +561,30 @@ Resources:
           Value: !Ref Confidentiality
         - Key: Compliance
           Value: !Ref Compliance
+  RDSReadReplicaDBInstance:
+    Type: "AWS::RDS::DBInstance"
+    Condition: CreateRDSReadReplication
+    Properties:
+      DBInstanceClass: !Ref DBInstanceClass
+      DBInstanceIdentifier: !Sub "rdsdb-${EnvironmentStage}-${ApplicationName}-ro"
+      Engine: !FindInMap [DBFamilyMap, !Ref DBEngineVersion, "engine"]
+      EngineVersion:
+        !FindInMap [DBFamilyMap, !Ref DBEngineVersion, "engineversion"]
+      MonitoringRoleArn:
+        !If [
+          IsEnhancedMonitoringEnabledCondition,
+          !GetAtt MonitoringIAMRole.Arn,
+          !Ref AWS::NoValue,
+        ]
+      PubliclyAccessible: false
+      SourceDBInstanceIdentifier: !Ref RDSMasterDBInstance
+      StorageType: gp2
+      VPCSecurityGroups:
+        - !If [
+            CreateSecurityGroup,
+            !Ref RDSSecurityGroup,
+            !Ref CustomDBSecurityGroup,
+          ]
   RDSDBClusterParameterGroup:
     Type: AWS::RDS::DBClusterParameterGroup
     Condition: IsAuroraCondition

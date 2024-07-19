@@ -15,6 +15,7 @@ Parameters:
     Type: String
     Description: Designates the environment stage of the associated AWS resource. (Optional)
     AllowedValues:
+      - 'spike'
       - 'dev'
       - 'test'
       - 'pre-prod'
