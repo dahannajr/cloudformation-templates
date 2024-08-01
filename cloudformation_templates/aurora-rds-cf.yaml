@@ -55,6 +55,7 @@ Parameters:
       - "Aurora-PostgreSQL12"
       - "RDS-PostgreSQL11"
       - "RDS-PostgreSQL12"
+      - "RDS-PostgreSQL14"
       - "Aurora-PostgreSQL10.12"
       - "RDS-MySQL8.0"
       - "RDS-SQLServerExpress-15"
@@ -279,6 +280,13 @@ Mappings:
     "RDS-PostgreSQL12":
       "family": "postgresql12"
       "engineversion": "12.17"
+      "enginename": "postgres"
+      "engine": "postgres"
+      "enginefamily": "POSTGRES"
+      "cloudwatchlogexports": ""
+    "RDS-PostgreSQL14":
+      "family": "postgresql14"
+      "engineversion": "14.10"
       "enginename": "postgres"
       "engine": "postgres"
       "enginefamily": "POSTGRES"
