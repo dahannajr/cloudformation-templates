@@ -1,0 +1,261 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Setup a private Aurora Serverless 2 cluster running PostgreSQL 16
+Parameters:
+  DBUserName:
+    Description: Name of the user created for the database
+    Type: String
+  MinCapacity:
+    Type: Number
+    Default: 2
+  MaxCapacity:
+    Type: Number
+    Default: 4
+  Port:
+    Type: Number
+    Default: 5432
+  VPCStackName:
+    Description: The name of the VPC stack (optional)
+    Type: String
+    Default: ""
+  VPCID:
+    Description: The ID of the VPC (required if VPCStackName is not provided)
+    Type: String
+    Default: ""
+  SubnetID1:
+    Description: The ID of the first subnet (required if VPCStackName is not provided)
+    Type: String
+    Default: ""
+  SubnetID2:
+    Description: The ID of the second subnet (required if VPCStackName is not provided)
+    Type: String
+    Default: ""
+
+Conditions:
+  UseVPCStack: !Not [!Equals [!Ref VPCStackName, ""]]
+
+Resources:
+  AuroraDBClusterSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties: 
+      DBSubnetGroupDescription: "Aurora DB subnet group"
+      SubnetIds: 
+        !If 
+          - UseVPCStack
+          - - Fn::ImportValue: !Join ["-", [!Ref VPCStackName, "PrivateSubnet1BID"]]
+            - Fn::ImportValue: !Join ["-", [!Ref VPCStackName, "PrivateSubnet2BID"]]
+          - - !Ref SubnetID1
+            - !Ref SubnetID2
+
+  AuroraDBClusterSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Aurora security group"
+      VpcId: 
+        !If 
+          - UseVPCStack
+          - Fn::ImportValue: !Join ["-", [!Ref VPCStackName, "VPCID"]]
+          - !Ref VPCID
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: 10.10.0.0/16
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: 10.0.0.0/16
+
+  AuroraDBClusterParameterGroup:
+    Type: AWS::RDS::DBClusterParameterGroup
+    Properties:
+      Description: "Aurora PostgreSQL cluster parameter group"
+      Family: aurora-postgresql16
+      Parameters:
+        application_name: 'sparkmeter'
+        password_encryption: 'md5'
+
+
+  AuroraDBCluster:
+    Type: AWS::RDS::DBCluster
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Delete
+    Properties:
+      AssociatedRoles:
+        - RoleArn: !GetAtt AuroraDBClusterS3ImportRole.Arn
+          FeatureName: s3Import
+        - RoleArn: !GetAtt AuroraDBClusterS3ExportRole.Arn
+          FeatureName: s3Export
+        - RoleArn: !GetAtt AuroraDBClusterLambdaRole.Arn
+          FeatureName: Lambda
+        - RoleArn: !GetAtt AuroraDBClusterS3SageMakerRole.Arn
+          FeatureName: SageMaker
+        - RoleArn: !GetAtt AuroraDBClusterComprehendRole.Arn
+          FeatureName: Comprehend   
+      Engine: aurora-postgresql
+      EngineVersion: "16"
+      EngineMode: provisioned
+      DBClusterParameterGroupName: !Ref AuroraDBClusterParameterGroup
+      DBSubnetGroupName: !Ref AuroraDBClusterSubnetGroup
+      VpcSecurityGroupIds: 
+        - !Ref AuroraDBClusterSecurityGroup
+      EnableIAMDatabaseAuthentication: true
+      BackupRetentionPeriod: 7
+      DatabaseName: postgres
+      Port: !Ref Port
+      MasterUsername:
+        Fn::Sub: "{{resolve:secretsmanager:${DbSecret}::username}}"
+      MasterUserPassword:
+        Fn::Sub: "{{resolve:secretsmanager:${DbSecret}::password}}"
+      ServerlessV2ScalingConfiguration: 
+        MaxCapacity: !Ref MaxCapacity
+        MinCapacity: !Ref MinCapacity
+
+  AuroraDBInstance1:
+    Type: 'AWS::RDS::DBInstance'
+    UpdateReplacePolicy: Snapshot
+    DeletionPolicy: Delete
+    Properties:
+      Engine: aurora-postgresql
+      DBClusterIdentifier: !Ref AuroraDBCluster
+      DBInstanceClass: db.serverless
+      PromotionTier: 0
+
+  AuroraDBInstance2:
+    Type: 'AWS::RDS::DBInstance'
+    UpdateReplacePolicy: Snapshot
+    DeletionPolicy: Delete
+    Properties:
+      Engine: aurora-postgresql
+      DBClusterIdentifier: !Ref AuroraDBCluster
+      DBInstanceClass: db.serverless
+      PromotionTier: 15
+      PubliclyAccessible: false
+
+  DbSecret:
+    Type: AWS::SecretsManager::Secret
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Delete
+    Properties:
+      GenerateSecretString:
+        SecretStringTemplate: !Sub |
+          {
+            "username": "${DBUserName}"
+          }
+        GenerateStringKey: "password"
+        PasswordLength: 30
+        ExcludeCharacters: '"@/\'
+      Name: !Sub ${AWS::StackName}-master-user-password  # Replace with your desired secret name
+
+  DbSecretTargetAttachment:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref DbSecret
+      TargetId: !Ref AuroraDBCluster
+      TargetType: AWS::RDS::DBCluster
+
+  AuroraDBClusterS3ImportRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: rds.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AuroraS3LambdaAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:GetObject
+                Resource: "*"
+            
+  AuroraDBClusterS3ExportRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: rds.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AuroraS3LambdaAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: "*"
+
+  AuroraDBClusterLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: rds.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AuroraS3LambdaAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: "*"
+
+  AuroraDBClusterS3SageMakerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: rds.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AuroraS3LambdaAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sagemaker:InvokeEndpoint
+                Resource: "*"
+
+  AuroraDBClusterComprehendRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: rds.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AuroraS3LambdaAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - comprehend:*
+                Resource: "*"
+Outputs:
+  DBClusterIdentifier:
+    Description: The DB Cluster Identifier
+    Value: !Ref AuroraDBCluster

@@ -1,0 +1,706 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::LanguageExtensions
+Description: A CloudFormation template to setup ECS Service and Task Definitions for use in Service Connect
+Parameters:
+  AutoScalingTargetValue:
+    Type: Number
+    Default: 50
+  CertificateStackName:
+    Type: String
+    Default: ""
+  Container1AppProtocol:
+    Description: The application protocol that's used for the port mapping. This parameter only applies to Service Connect. 
+    Type: String
+    Default: ""
+  Container1ALBListenerRuleType:
+    Description: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-listeners.html#rule-condition-types
+    Type: String
+    Default: ""
+    AllowedValues:
+      - "host-header"
+      - ""
+  Container1ALBListenerRuleValue:
+    Description: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-listeners.html#rule-condition-types
+    Type: String
+    Default: ""
+  Container1HealthCheckPath:
+    Description: URI to test for container healthiness
+    Type: String
+    Default: ""
+  Container1Command:
+    Description: Command Override for Container 1
+    Type: String
+    Default: ""
+  Container1ContainerName:
+    Description: Name of container to run in Task Instance
+    Type: String
+    Default: ""
+  Container1ImageArn:
+    Description: ARN of image to use for container in Task Defintion
+    Type: String
+    Default: ""
+  Container1ImageTag:
+    Description: Image tag to be used in for this container
+    Type: String
+    Default: "latest"
+  Container1Port:
+    Description: Port to expose from the Task Instance
+    Type: Number
+    Default: 0
+  Container1SecretArns:
+    Description: ARN of the secrets manager containing JSON elements for use in the containers environment setup.
+    Type: CommaDelimitedList
+    Default: ""
+  Container1SecretKeys:
+    Description: 0 based index into the SecretARNs list, followed by the JSON Key of the variable
+    Type: CommaDelimitedList
+    Default: ""
+  Container1SecretsDefinitionNameList:
+    Description: Command seperated string of environment variable to be used in the container definition.
+    Type: CommaDelimitedList
+    Default: ""
+  DesiredTaskInstancesInService:
+    Type: Number
+    Default: 1
+  ECSTaskDefCPU:
+    Description: The number of cpu units used by the task.
+    Type: String
+    Default: ""
+  ECSTaskDefMemory:
+    Description: The amount (in MiB) of memory used by the task.
+    Type: String
+    Default: ""
+  ECSClusterStackName:
+    Description: Name of the stack which created the ECS Cluster
+    Type: String
+  ECSServiceDeploymentController:
+    Description: The deployment controller type to use. There are three deployment controller types available
+    Type: String
+    Default: ECS
+    AllowedValues:
+      - ECS
+      - CODE_DEPLOY
+      - EXTERNAL
+  EnableFirelens:
+    Description: Enable log streaming through Kinesis Firehose
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+  EnableFluentd:
+    Description: Enable log streaming through Fluentd
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+  ECSTaskDefEphemeralStorageSizeInGB:
+    Description: Size of the ephemeral stroage to be associated with the Task Definition
+    Type: Number
+    Default: 20
+    MinValue: 20
+    MaxValue: 200
+  LoadBalancerEnableHttp2Routing:
+    Description:  Indicates whether HTTP/2 is enabled. The possible values are true and false.
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+  LoadBalancerEnableLogging:
+    Description: Enable logging of ALB access logs to S3
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+  Environment:
+    Description: Environment infrastructure is being deployed in
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - shared
+      - prod
+      - test
+  LogGroup:
+    Description: Name of the log group
+    Type: String
+    Default: "/aws/ecs/"
+  LaunchType:
+    Type: String
+    Default: FARGATE
+    AllowedValues:
+      - FARGATE
+      - EC2
+  NetworkMode:
+    Type: String
+    Description: The Docker networking mode to use for the containers in the task.
+    Default: awsvpc
+    AllowedValues:
+      - awsvpc
+      - bridge
+      - host
+      - none
+  ECSTaskDefCpuArchitecture:
+    Description: X86_64 or ARM64 for the task defintion
+    Type: String
+    Default: X86_64
+    AllowedValues:
+      - X86_64
+      - ARM64
+  HostedZoneId:
+    Type: String
+    Default: ""
+  HostedZoneName:
+    Type: String
+    Default: ""
+  LoadBalancerHttpPort:
+    Type: Number
+    Default: 0
+  LoadBalancerHttpsPort:
+    Type: Number
+    Default: 0
+  MatcherHttpCode:
+    Description: Specifies the HTTP codes that healthy targets must use when responding to an HTTP health check.
+    Type: String
+    Default: 200-299,301,302
+  MaxTaskInstancesInService:
+    Type: Number
+    Default: 10
+  MinTaskInstancesInService:
+    Type: Number
+    Default: 1
+  SecurityGroupStackName:
+    Type: String
+    Default: ""
+  SecurityGroupStackExportVariableName:
+    Type: String
+    Default: SecurityGroupId
+  ServiceName:
+    Description: Name given to the ECS Service
+    Type: String
+  Subdomain:
+    Type: String
+    Default: ""
+  VPCStackName:
+    Description: Name of the stack used to create the VPC
+    Type: String
+Conditions:
+  CreateEphemeralStorageCondition: !Not 
+    - !Equals 
+      - !Ref ECSTaskDefEphemeralStorageSizeInGB
+      - 20
+  CreateLoadBalancerCondition: !Or
+    - !Not
+      - !Equals
+        - !Ref LoadBalancerHttpPort
+        - 0
+    - !Not
+      - !Equals
+        - !Ref LoadBalancerHttpsPort
+        - 0
+  CreatePublicHTTPListener: !And 
+    - !Condition CreateLoadBalancerCondition
+    - !Not 
+      - !Equals 
+        - !Ref LoadBalancerHttpPort
+        - 0
+  CreatePublicHTTPSListener: !And 
+    - !Condition CreateLoadBalancerCondition
+    - !Not 
+      - !Equals 
+        - !Ref LoadBalancerHttpsPort
+        - 0
+  CreateRoute53RecordSet: !And 
+    - !Condition CreateLoadBalancerCondition
+    - !Not  
+      - !Equals 
+        - !Ref Subdomain
+        - ""
+    - !Not  
+      - !Equals 
+        - !Ref HostedZoneName
+        - ""
+    - !Not  
+      - !Equals 
+        - !Ref HostedZoneId
+        - ""
+  EnableFirelensCondition: !Equals 
+    - !Ref EnableFirelens
+    - "true"
+  EnableFluentdCondition: !Equals 
+    - !Ref EnableFluentd
+    - "true"
+  Container1HasCommand: !Not 
+    - !Equals 
+      - !Ref Container1Command
+      - ''
+  Container1HasAppProtocol: !Not 
+    - !Equals 
+      - !Ref Container1AppProtocol
+      - ''
+  LoadBalancerEnableLoggingCondition: !Equals 
+    - !Ref LoadBalancerEnableLogging
+    - true
+  IsECSServiceDeploymentControllerUsingECS: !Equals 
+    - !Ref ECSServiceDeploymentController
+    - "ECS"
+  IsFargateLaunchType: !Equals 
+    - !Ref LaunchType
+    - "FARGATE"
+  TaskDefitionContainer1HasExposedPort: !Not 
+    - !Equals 
+      - !Ref Container1Port
+      - 0
+  TaskDefitionContainer1HasHealthCheck: !Not 
+    - !Equals 
+      - !Ref Container1HealthCheckPath
+      - ""
+  TaskDefitionContainer1UsesImageArn: !Not 
+    - !Equals 
+      - !Ref Container1ImageArn
+      - ""
+  UseIPTargetType: !Equals
+    - !Ref NetworkMode
+    - "awsvpc"
+Resources:
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      # Name of the task definition. Subsequent versions of the task definition are grouped together under this name.
+      Family: !Join ["-", [!Ref ServiceName, TaskDefinition1]]
+      # awsvpc is required for Fargate
+      NetworkMode: !Ref NetworkMode
+      # 256 (.25 vCPU) - Available memory values: 0.5GB, 1GB, 2GB
+      # 512 (.5 vCPU) - Available memory values: 1GB, 2GB, 3GB, 4GB
+      # 1024 (1 vCPU) - Available memory values: 2GB, 3GB, 4GB, 5GB, 6GB, 7GB, 8GB
+      # 2048 (2 vCPU) - Available memory values: Between 4GB and 16GB in 1GB increments
+      # 4096 (4 vCPU) - Available memory values: Between 8GB and 30GB in 1GB increments
+      Cpu: !Ref ECSTaskDefCPU
+      # 0.5GB, 1GB, 2GB - Available cpu values: 256 (.25 vCPU)
+      # 1GB, 2GB, 3GB, 4GB - Available cpu values: 512 (.5 vCPU)
+      # 2GB, 3GB, 4GB, 5GB, 6GB, 7GB, 8GB - Available cpu values: 1024 (1 vCPU)
+      # Between 4GB and 16GB in 1GB increments - Available cpu values: 2048 (2 vCPU)
+      # Between 8GB and 30GB in 1GB increments - Available cpu values: 4096 (4 vCPU)
+      Memory: !Ref ECSTaskDefMemory
+      # A role needed by ECS.
+      # "The ARN of the task execution role that containers in this task can assume. All containers in this task are granted the permissions that are specified in this role."
+      # "There is an optional task execution IAM role that you can specify with Fargate to allow your Fargate tasks to make API calls to Amazon ECR."
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      # "The Amazon Resource Name (ARN) of an AWS Identity and Access Management (IAM) role that grants containers in the task permission to call AWS APIs on your behalf."
+      TaskRoleArn: !Ref TaskRole
+      RuntimePlatform: 
+        CpuArchitecture: !Ref ECSTaskDefCpuArchitecture
+      ContainerDefinitions:
+        - Name: !Ref Container1ContainerName
+          Image: !Join
+            - ":"
+            - - !Ref Container1ImageArn
+              - !Ref Container1ImageTag
+          Command: !If 
+            - Container1HasCommand
+            - !Split [',', !Ref Container1Command]
+            - !Ref AWS::NoValue
+          PortMappings: 
+            - ContainerPort: !Ref Container1Port
+              HostPort: !Ref Container1Port
+              Name: !Sub "${Container1ContainerName}-${Container1Port}"
+              AppProtocol: !If 
+                - Container1HasAppProtocol
+                - !Ref Container1AppProtocol
+                - !Ref AWS::NoValue
+              Protocol: tcp
+          Secrets:
+            'Fn::Transform':
+                Name: ECSSecretsTransformation
+                Parameters:
+                  Names: !Ref Container1SecretsDefinitionNameList
+                  SecretArns: !Ref Container1SecretArns
+                  SecretKeys: !Ref Container1SecretKeys
+          LogConfiguration: 
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref LogGroup
+              awslogs-create-group: true
+              awslogs-stream-prefix: container
+              mode: non-blocking
+        - !Ref AWS::NoValue
+        
+  # A role needed by ECS
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ["", [!Ref ServiceName, ExecutionRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: AllowECRCreateLogGroup
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - "logs:CreateLogGroup"
+                Resource: "*"
+        - PolicyName: AllowECRContainerPull
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - "ecr:*"
+                Resource: "*"
+        - PolicyName: AllowRetrieveSecrets
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "secretsmanager:GetSecretValue"
+                  - "kms:Decrypt"
+                Resource:
+                  - "*"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+  # A role for the containers
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ["", [!Ref ServiceName, TaskRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: "sts:AssumeRole"
+      # ManagedPolicyArns:
+      #   -
+      Policies:
+        - PolicyName: AllEcsExecPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "ecs:ExecuteCommand"
+                  - "ssmmessages:CreateControlChannel"
+                  - "ssmmessages:CreateDataChannel"
+                  - "ssmmessages:OpenControlChannel"
+                  - "ssmmessages:OpenDataChannel"
+                Resource:
+                  - "*"
+        - PolicyName: AllowRetrieveSecrets
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "secretsmanager:GetSecretValue"
+                  - "kms:Decrypt"
+                Resource:
+                  - "*"
+  # A role needed for auto scaling
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: CreateLoadBalancerCondition
+    Properties:
+      GroupDescription:
+        !Join ["", [!Ref ServiceName, LoadBalancerSecurityGroup]]
+      VpcId:
+        Fn::ImportValue: !Join ["-", [!Ref VPCStackName, "VPCID"]]
+      SecurityGroupIngress:
+        - !If
+          - CreatePublicHTTPListener
+          - IpProtocol: tcp
+            FromPort: !Ref LoadBalancerHttpPort
+            ToPort: !Ref LoadBalancerHttpPort
+            CidrIp: 0.0.0.0/0
+          - !Ref AWS::NoValue
+        - !If
+          - CreatePublicHTTPSListener
+          - IpProtocol: tcp
+            FromPort: !Ref LoadBalancerHttpsPort
+            ToPort: !Ref LoadBalancerHttpsPort
+            CidrIp: 0.0.0.0/0
+          - !Ref AWS::NoValue
+  SecurityGroupStackNameLBIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: CreateLoadBalancerCondition
+    Properties:
+      Description: Ingress from load balancer to ECS cluster servers
+      GroupId:
+        Fn::ImportValue:
+          !Join [
+            "-",
+            [
+              !Ref SecurityGroupStackName,
+              !Ref SecurityGroupStackExportVariableName,
+            ],
+          ]
+      IpProtocol: "-1"
+      SourceSecurityGroupId: !Ref "LoadBalancerSecurityGroup"
+  Service:
+    Type: AWS::ECS::Service
+    # This dependency is needed so that the load balancer is setup correc
+    DependsOn: 
+      - ListenerRule1
+    Properties:
+      ServiceName: !Ref ServiceName
+      EnableExecuteCommand: true
+      Cluster:
+        Fn::ImportValue: !Join ["-", [!Ref ECSClusterStackName, "Cluster"]]
+      TaskDefinition: !Ref TaskDefinition
+      DeploymentConfiguration: !If 
+        - IsECSServiceDeploymentControllerUsingECS
+        - MinimumHealthyPercent: 100
+          MaximumPercent: 200
+          DeploymentCircuitBreaker: 
+            Enable: true
+            Rollback: true
+        - !Ref AWS::NoValue
+      DeploymentController:
+        Type: !Ref ECSServiceDeploymentController
+      DesiredCount: !Ref DesiredTaskInstancesInService
+      # This may need to be adjusted if the container takes a while to st
+      HealthCheckGracePeriodSeconds: !If
+        - CreateLoadBalancerCondition
+        - 30
+        - !Ref AWS::NoValue
+      LaunchType: !Ref LaunchType
+      NetworkConfiguration: 
+        AwsvpcConfiguration:
+          # change to DISABLED if you're using private subnets that have 
+          AssignPublicIp: DISABLED
+          Subnets:
+            - Fn::ImportValue:
+                !Join ["-", [!Ref VPCStackName, "PrivateSubnet1AID"]]
+            - Fn::ImportValue:
+                !Join ["-", [!Ref VPCStackName, "PrivateSubnet2AID"]]
+          SecurityGroups:
+            - Fn::ImportValue:
+                !Join [
+                  "-",
+                  [
+                    !Ref SecurityGroupStackName,
+                    !Ref SecurityGroupStackExportVariableName,
+                  ],
+                ]
+      LoadBalancers: 
+        - !If
+          - CreateLoadBalancerCondition
+          - !If
+            - TaskDefitionContainer1HasExposedPort
+            - ContainerName: !Ref Container1ContainerName
+              ContainerPort: !Ref Container1Port
+              TargetGroupArn: !Ref TargetGroup1
+            - !Ref AWS::NoValue
+          - !Ref AWS::NoValue
+      PlatformVersion: !If
+        - IsFargateLaunchType
+        - 1.4.0
+        - !Ref AWS::NoValue
+  TargetGroup1:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Condition: TaskDefitionContainer1HasExposedPort
+    Properties:
+      HealthCheckIntervalSeconds: 60
+      # will look for a 200 status code by default unless specified other
+      HealthCheckPath: !If
+        - TaskDefitionContainer1HasHealthCheck
+        - !Ref Container1HealthCheckPath
+        - !Ref AWS::NoValue
+      HealthCheckTimeoutSeconds: 10
+      UnhealthyThresholdCount: 5
+      HealthyThresholdCount: 2
+      Matcher:
+        HttpCode: !Ref MatcherHttpCode
+      Name: !Join ["-", [!Ref Container1ContainerName, TG]]
+      Port: !Ref Container1Port
+      Protocol: HTTP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: "60" # default is 300
+        - Key: stickiness.enabled
+          Value: true
+        - Key: stickiness.type
+          Value: lb_cookie
+      TargetType: !If
+        - UseIPTargetType
+        - ip
+        - instance
+      VpcId:
+        Fn::ImportValue: !Join ["-", [!Ref VPCStackName, "VPCID"]]
+  ListenerRule1:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Condition: TaskDefitionContainer1HasExposedPort
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup1
+      Conditions:
+        - Field: !Ref Container1ALBListenerRuleType
+          HostHeaderConfig:
+            Values:
+              - !Sub "${Container1ALBListenerRuleValue}"
+      ListenerArn: !If 
+        - CreatePublicHTTPSListener
+        - !Ref ListenerHTTPS
+        - !Ref ListenerHTTP
+      Priority: 1
+  ListenerHTTP:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: CreatePublicHTTPListener
+    DependsOn: LoadBalancer
+    Properties:
+      DefaultActions: !If 
+        - CreatePublicHTTPSListener
+        - - Type: "redirect"
+            RedirectConfig:
+              Protocol: "HTTPS"
+              Port: 443
+              Host: "#{host}"
+              Path: "/#{path}"
+              Query: "#{query}"
+              StatusCode: "HTTP_301"
+        - - TargetGroupArn: !Ref TargetGroup1
+            Type: forward
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+  ListenerHTTPS:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: CreatePublicHTTPSListener
+    DependsOn: LoadBalancer
+    Properties:
+      DefaultActions: !If 
+        - TaskDefitionContainer1HasExposedPort
+        - - TargetGroupArn: !Ref TargetGroup1
+            Type: forward
+        - - FixedResponseConfig:
+              ContentType: "text/plain"
+              MessageBody: "No valid target defined"
+              StatusCode: 200
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn:
+            Fn::ImportValue:
+              !Join ["-", [!Ref CertificateStackName, "CertificateArn"]]
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Condition: CreateLoadBalancerCondition
+    Properties:
+      LoadBalancerAttributes:
+        # this is the default, but is specified here in case it needs to be changed
+        - Key: idle_timeout.timeout_seconds
+          Value: "60"
+        - Key: routing.http2.enabled
+          Value: !Ref LoadBalancerEnableHttp2Routing
+        - !If
+          - LoadBalancerEnableLoggingCondition
+          - Key: access_logs.s3.enabled
+            Value: true
+          - !Ref AWS::NoValue
+        - !If
+          - LoadBalancerEnableLoggingCondition
+          - Key: access_logs.s3.bucket
+            Value: !Ref S3LoadBalancerAccessLogsBucket
+          - !Ref AWS::NoValue
+        - !If
+          - LoadBalancerEnableLoggingCondition
+          - Key: access_logs.s3.prefix
+            Value: Logs
+          - !Ref AWS::NoValue
+      Name: !Join ["", [!Ref ServiceName, LB]]
+      # "internal" is also an option
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+      Subnets:
+        - Fn::ImportValue: !Join ["-", [!Ref VPCStackName, "PublicSubnet1ID"]]
+        - Fn::ImportValue: !Join ["-", [!Ref VPCStackName, "PublicSubnet2ID"]]
+  AutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ["", [!Ref ServiceName, AutoScalingRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole"
+  AutoScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MinCapacity: !Ref MinTaskInstancesInService
+      MaxCapacity: !Ref MaxTaskInstancesInService
+      ResourceId: !Join
+        - "/"
+        - - "service"
+          - Fn::ImportValue: !Join ["-", [!Ref ECSClusterStackName, "Cluster"]]
+          - !GetAtt Service.Name
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+      # "The Amazon Resource Name (ARN) of an AWS Identity and Access Management (IAM) role that allows Application Auto Scaling to modify your scalable target."
+      RoleARN: !GetAtt AutoScalingRole.Arn
+  AutoScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Join ["", [!Ref ServiceName, AutoScalingPolicy]]
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref AutoScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        ScaleInCooldown: 10
+        ScaleOutCooldown: 10
+        # Keep things at or lower than 50% CPU utilization, for example
+        TargetValue: !Ref AutoScalingTargetValue
+  S3LoadBalancerAccessLogsBucket:
+    Condition: LoadBalancerEnableLoggingCondition
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Type: AWS::S3::Bucket
+  S3LoadBalancerAccessLogsBucketPolicy:
+    Condition: LoadBalancerEnableLoggingCondition
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3LoadBalancerAccessLogsBucket
+      PolicyDocument:
+        Statement:
+          - Sid: ELBAccessLogs20130930
+            Effect: Allow
+            Resource: !Join
+              - ""
+              - - !FindInMap
+                  - RegionARNPrefix
+                  - !Ref "AWS::Region"
+                  - ARNPrefix
+                - "s3:::"
+                - !Ref "S3LoadBalancerAccessLogsBucket"
+                - /
+                - Logs
+                - /AWSLogs/
+                - !Ref "AWS::AccountId"
+                - /*
+            Principal:
+              AWS:
+                !FindInMap [RegionELBAccountId, !Ref "AWS::Region", AccountId]
+            Action: ["s3:PutObject"]
+Outputs:
+  LoadBalancerDomainName:
+    Condition: CreateLoadBalancerCondition
+    Description: The DNS name for the load balancer.
+    Value: !GetAtt LoadBalancer.DNSName
+    Export:
+      Name: !Sub "${AWS::StackName}-LoadBalancerDomainName"

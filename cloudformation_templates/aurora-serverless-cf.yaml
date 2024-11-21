@@ -1,0 +1,121 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "AWS RDS / Aurora"
+Metadata:
+  LICENSE: Apache License Version 2.0
+Parameters:
+  DBUserName:
+    Description:  Name of the user created for the database
+    Type: String
+  Engine:
+    Description: The name of the database engine to be used for this DB cluster.
+    Type: String
+    Default: aurora-postgresql
+    AllowedValues:
+      - aurora-mysql
+      - aurora-postgresql
+      - mysql
+      - postgres
+  EngineVersion:
+    Description: The version number of the database engine to use.
+    Type: String
+    Default: 16.1
+  MinCapacity:
+    Type: Number
+    Default: 2
+  MaxCapacity:
+    Type: Number
+    Default: 4
+  Port:
+    Type: Number
+    Default: 5432
+  ServerlessVersion: 
+    Description: V1 or V2 of Aurora Serverless
+    Type: String
+    Default: V1
+    AllowedValues:
+      - V1
+      - V2
+  VPCStackName:
+    Description: The value used for the name tag of the bastion host
+    Type: String
+Conditions:
+  UseAuroraServerlessV1: !Equals 
+    - !Ref ServerlessVersion
+    - V1
+Resources:
+  AuroraServerlessPostgresDB:
+    Type: AWS::RDS::DBCluster
+    UpdateReplacePolicy: Snapshot
+    DeletionPolicy: Snapshot
+    Properties:
+      Engine: !Ref Engine
+      EngineMode: !If 
+        - UseAuroraServerlessV1
+        - serverless
+        - provisioned
+      EngineVersion: !Ref EngineVersion
+      DatabaseName: sparkmeter
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      DBClusterIdentifier: !Sub ${AWS::StackName}-cluster
+      MasterUsername:
+        Fn::Sub: "{{resolve:secretsmanager:${DbSecret}::username}}"
+      MasterUserPassword:
+        Fn::Sub: "{{resolve:secretsmanager:${DbSecret}::password}}"
+      BackupRetentionPeriod: 30
+      Port: !Ref Port
+      ScalingConfiguration: !If 
+        - UseAuroraServerlessV1
+        - AutoPause: true
+          MaxCapacity: !Ref MaxCapacity
+          MinCapacity: !Ref MinCapacity
+        - !Ref AWS::NoValue
+      ServerlessV2ScalingConfiguration: !If 
+        - UseAuroraServerlessV1
+        - !Ref AWS::NoValue
+        - MaxCapacity: !Ref MaxCapacity
+          MinCapacity: !Ref MinCapacity
+      VpcSecurityGroupIds:
+        - !Ref AuroraSecurityGroup
+
+  DbSecret:
+    Type: AWS::SecretsManager::Secret
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Delete
+    Properties:
+      GenerateSecretString:
+        SecretStringTemplate: !Sub |
+          {
+            "username": "${DBUserName}"
+          }
+        GenerateStringKey: "password"
+        PasswordLength: 30
+        ExcludeCharacters: '"@/\'
+      Name: !Sub ${AWS::StackName}-master-user-password  # Replace with your desired secret name
+
+  DbSecretTargetAttachment:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref DbSecret
+      TargetId: !Ref AuroraServerlessPostgresDB
+      TargetType: AWS::RDS::DBCluster
+
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Allows other SGs to be added for ingress to the database
+      DBSubnetGroupName: AuroraDBSubnetGroup
+      SubnetIds:
+        - Fn::ImportValue: !Join ["-", [!Ref VPCStackName, "PrivateSubnet1BID"]]
+        - Fn::ImportValue: !Join ["-", [!Ref VPCStackName, "PrivateSubnet2BID"]]
+
+  AuroraSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Aurora PostgreSQL
+      VpcId: 
+        Fn::ImportValue: !Join ["-", [!Ref VPCStackName, "VPCID"]]
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref Port
+          ToPort: !Ref Port
+          CidrIp: 10.10.0.0/16  # Replace with your specific IP range for security
