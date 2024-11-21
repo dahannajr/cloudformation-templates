@@ -278,6 +278,7 @@ Resources:
         DeploymentCircuitBreaker: 
           Enable: true
           Rollback: true
+      EnableExecuteCommand: true 
       DeploymentController:
         Type: !Ref ECSServiceDeploymentController
       DesiredCount: !Ref DesiredTaskInstancesInService
@@ -333,6 +334,8 @@ Resources:
               - Port: !Ref Container1Port
                 DnsName: !Ref Container1ContainerName
             PortName: !Sub "${Container1ContainerName}-${Container1Port}"
+            Timeout:
+              PerRequestTimeoutSeconds: 0
   ServiceDiscovery:
     Type: AWS::ServiceDiscovery::Service
     Properties:
